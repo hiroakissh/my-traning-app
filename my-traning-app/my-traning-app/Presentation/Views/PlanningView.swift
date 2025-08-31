@@ -1,86 +1,77 @@
 import SwiftUI
 
-// ダミーデータ
-struct PlanItem: Identifiable {
-    let id = UUID()
-    let title: String
-    let goal: String
-    let duration: String
-}
-
-let longTermPlan = PlanItem(title: "長期プラン", goal: "ベンチプレス100kg達成", duration: "2025/09/01 - 2026/08/31")
-let midTermPlan = PlanItem(title: "中期プラン", goal: "ベンチプレス80kg達成", duration: "2025/09/01 - 2025/11/30")
-let shortTermPlan = PlanItem(title: "短期プラン", goal: "ベンチプレス65kg達成", duration: "2025/09/01 - 2025/09/30")
+import SwiftUI
 
 struct PlanningView: View {
+    // AIプランナーをViewの状態として監視
+    @StateObject private var planner = AIWorkoutPlanner()
+    
+    // プラン再生成をトリガーするためのState
+    @State private var triggerPlanGeneration = false
+
     var body: some View {
         NavigationStack {
-            List {
-                Section(header: Text("長期プラン").font(.title2).bold()) {
-                    PlanRow(plan: longTermPlan)
+            VStack {
+                if planner.isLoading {
+                    // ローディング中の表示
+                    ProgressView("新しいプランを生成しています...")
+                        .padding()
+                } else if let errorMessage = planner.errorMessage {
+                    // エラーメッセージの表示
+                    Text(errorMessage)
+                        .foregroundColor(.red)
+                        .padding()
+                } else if !planner.generatedPlan.isEmpty {
+                    // 生成されたプランの表示
+                    ScrollView {
+                        Text(planner.generatedPlan)
+                            .padding()
+                    }
+                } else {
+                    // 初期表示またはプランがない場合の表示
+                    Text("「再生成」ボタンを押して、新しいプランを作成してください。")
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding()
                 }
                 
-                Section(header: Text("中期プラン").font(.title2).bold()) {
-                    PlanRow(plan: midTermPlan)
-                }
-                
-                Section(header: Text("短期プラン").font(.title2).bold()) {
-                    PlanRow(plan: shortTermPlan)
-                }
+                Spacer()
             }
-            .listStyle(.grouped)
             .navigationTitle("プランニング")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {}) {
+                    Button(action: {
+                        // ボタンタップでプラン生成をトリガー
+                        triggerPlanGeneration = true
+                    }) {
                         HStack {
                             Image(systemName: "arrow.clockwise.circle.fill")
                             Text("再生成")
                         }
                     }
                     .buttonStyle(.bordered)
+                    .disabled(planner.isLoading) // ローディング中はボタンを無効化
+                }
+            }
+            // triggerPlanGenerationがtrueになったら非同期タスクを実行
+            .task(id: triggerPlanGeneration) {
+                if triggerPlanGeneration {
+                    // ダミーのユーザー情報と目標でプラン生成をリクエスト
+                    let dummyProfile = UserProfile(age: 30, gender: "男性", height: 175, weight: 70)
+                    await planner.createPlan(userProfile: dummyProfile, goal: "3ヶ月で筋力アップを目指す")
+                    
+                    // トリガーをリセット
+                    triggerPlanGeneration = false
                 }
             }
         }
     }
 }
 
-// MARK: - Subviews
-
-private struct PlanRow: View {
-    let plan: PlanItem
-    
-    var body: some View {
-        NavigationLink(destination: PlanDetailView(plan: plan)) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(plan.goal)
-                    .font(.headline)
-                Text(plan.duration)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            .padding(.vertical, 8)
-        }
-    }
+#Preview {
+    PlanningView()
 }
 
-// MARK: - Detail View
-
-struct PlanDetailView: View {
-    let plan: PlanItem
-    
-    var body: some View {
-        VStack {
-            Text(plan.title).font(.largeTitle)
-            Text(plan.goal).font(.title2)
-            Text(plan.duration).font(.headline)
-            // ここにプランの詳細なスケジュール（カレンダーなど）が表示される
-            Spacer()
-        }
-        .navigationTitle(plan.title)
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
 
 
 #Preview {
