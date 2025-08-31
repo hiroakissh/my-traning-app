@@ -13,6 +13,11 @@ struct MainView: View {
                     Label("履歴", systemImage: "clock.fill")
                 }
 
+            RecordingView()
+                .tabItem {
+                    Label("記録", systemImage: "plus.circle.fill")
+                }
+
             PlanningView()
                 .tabItem {
                     Label("プラン", systemImage: "list.bullet.clipboard.fill")
