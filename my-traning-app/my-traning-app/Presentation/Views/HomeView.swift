@@ -1,0 +1,11 @@
+import SwiftUI
+
+struct HomeView: View {
+    var body: some View {
+        Text("ホーム画面")
+    }
+}
+
+#Preview {
+    HomeView()
+}
