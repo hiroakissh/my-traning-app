@@ -1,43 +1,43 @@
-# Stability Phase 1 Spec
+# 安定化フェーズ1仕様
 
-## Summary
-The goal of this iteration is to replace crash-based error handling with resilient user-visible flows around AI planning and workout menu loading. We will introduce graceful fallbacks when the on-device Foundation Model is unavailable, surface actionable guidance in the Home and Planning screens, and make JSON resource loading recoverable. The work focuses on eliminating fatal errors that currently terminate the app and aligning the implementation with the documented UX expectations for robust messaging.
+## 概要
+本イテレーションの目的は、AIプランニングとワークアウトメニュー読み込みにおけるクラッシュベースのエラーハンドリングを排除し、ユーザーが状況を理解して再試行できるレジリエンスを確保することです。オンデバイスの Foundation Model が利用できない場合でも致命的な終了を避け、ホーム画面およびプランニング画面で案内メッセージを表示できるようにします。また、JSON リソース読み込み時の失敗をアプリ終了ではなく呼び出し元で処理できるように変更し、設計ドキュメントで求められている堅牢な UX に揃えます。
 
-## Background
-- `LiveFoundationModelClient` currently calls `fatalError()` across multiple `SystemLanguageModel.Availability` branches, causing the app to crash whenever Apple Intelligence is unavailable or restricted.
-- `HomeView` and `PlanningView` rely on `AIWorkoutPlanner.errorMessage` to inform users, but the planner only surfaces generic `localizedDescription` strings and cannot distinguish between availability states.
-- The JSON loading helper `Bundle.decode` uses `fatalError`, which aborts the process on missing or malformed resource files. The design guidelines call for user-facing error surfaces and recovery paths instead of abrupt termination.
+## 背景
+- `LiveFoundationModelClient` は `SystemLanguageModel.Availability` の複数の分岐で `fatalError()` を呼び出しており、Apple Intelligence が利用できない／制限されている端末でアプリが即座にクラッシュする。
+- `HomeView` と `PlanningView` は `AIWorkoutPlanner.errorMessage` を通じて利用者へ状況を伝える設計だが、現在のプランナーは `localizedDescription` のみを返し、利用不可理由を区別できない。
+- JSON 読み込みヘルパー `Bundle.decode` は `fatalError` を使用しており、リソース欠如や形式不備があるとプロセスが終了する。設計ガイドラインではユーザー向けエラー表示とリカバリー手段を求めている。
 
-## Goals
-1. Detect and classify all Apple Intelligence availability states and return structured errors from `LiveFoundationModelClient` without crashing.
-2. Extend `AIWorkoutPlanner` to map structured Foundation Model errors to localized, user-friendly copy required by the Home and Planning screens.
-3. Update the UI so that availability guidance is shown inline (e.g., request to enable Apple Intelligence, fallback messaging when the device is unsupported).
-4. Refactor `Bundle.decode` to throw errors that can be handled by callers, preventing app termination during workout menu loading.
-5. Add unit test coverage that validates the new error mapping behaviour and JSON loading error propagation.
-6. Clean up duplicate preview declarations in `PlanningView` while touching the screen for messaging changes.
+## 目標
+1. `LiveFoundationModelClient` で Apple Intelligence の全ての利用可否ステータスを判定し、クラッシュせず構造化されたエラーを返す。
+2. `AIWorkoutPlanner` で Foundation Model エラーをローカライズ済みのユーザーフレンドリーな文言へ変換し、ホーム画面とプランニング画面から利用できるようにする。
+3. UI を更新し、端末が非対応／未設定／ダウンロード中などの状況に応じて適切な案内メッセージを画面内に表示する。
+4. `Bundle.decode` を投げるメソッドへリファクタリングし、呼び出し側が復帰処理を実装できるようにする。
+5. Foundation Model の利用可否マッピングと JSON 読み込み失敗の振る舞いを検証するユニットテストを追加する。
+6. `PlanningView` に存在する重複プレビュー宣言を整理する。
 
-## Non-Goals
-- Implementing the full AI conversation history or plan detail UX described in the screen specification (out of scope for this iteration).
-- Introducing persistent storage (SwiftData) for plans or logs.
-- Implementing navigation flows from Home to Recording beyond what is necessary to display new error messages.
+## 非目標
+- 画面仕様で定義されている AI 会話履歴や詳細プラン表示の完全実装。
+- `WorkoutPlan` や `TrainingLog` など SwiftData 永続化レイヤーの導入。
+- ホーム画面から記録画面への遷移など、今回のメッセージ更新に直接関係しないナビゲーション改善。
 
-## User Stories
-- As a user on an unsupported device, I want to understand why AI features are unavailable instead of experiencing a crash.
-- As a user who has not enabled Apple Intelligence, I want clear guidance on enabling it so that I can use AI planning features.
-- As a developer running the app without bundled JSON resources, I want to see recoverable errors that help me diagnose the issue without the simulator crashing.
+## ユーザーストーリー
+- 非対応端末の利用者として、クラッシュではなく理由が分かるメッセージを見たい。
+- Apple Intelligence を無効化した利用者として、機能を有効化するための手順を画面で確認したい。
+- 開発者として、バンドル内に JSON リソースがない場合でもクラッシュせず原因を把握したい。
 
-## Acceptance Criteria
-1. Triggering `generateTodaySuggestion` or `generatePlan` on a device where Apple Intelligence is off shows an in-app message asking the user to enable the feature, and the app does not crash.
-2. Triggering AI generation on an unsupported device surfaces an inline message explaining that the device is not eligible.
-3. When the language model is still downloading, a non-fatal message is logged and the user receives a retry prompt once loading completes.
-4. Removing the `workout_menus.json` file from the bundle results in the Recording screen showing a graceful error state instead of crashing.
-5. Unit tests cover Foundation Model availability error mapping and the throwable Bundle decoder.
-6. `PlanningView` declares a single preview provider.
+## 受け入れ条件
+1. Apple Intelligence が無効な端末で `generateTodaySuggestion` または `generatePlan` を呼ぶと、機能有効化を促すメッセージが表示され、アプリは終了しない。
+2. 非対応端末で AI 生成を開始すると、端末が対象外である旨の案内が表示される。
+3. モデルのダウンロード中はクラッシュせず、完了後に再試行できるようメッセージとログが残る。
+4. `workout_menus.json` をバンドルから削除した場合、記録画面はクラッシュせずエラー状態を表示する。
+5. Foundation Model の利用可否マッピングと Bundle デコーダーの throwable 化を検証するユニットテストが存在し、成功・失敗それぞれのケースをカバーする。
+6. `PlanningView` のプレビュー宣言が1つだけになる。
 
-## Open Questions
-- Should we add analytics hooks for each availability error? (Out of scope for now; record decision in future iteration.)
-- What is the localized copy for each availability state? (Use Japanese copy aligned with existing UI language, verify with UX later.)
+## 未解決事項
+- 各利用不可理由のトラッキングを分析に送るかどうか（今回は対象外。将来のイテレーションで再検討）。
+- 各案内文のローカライズ最終確認（現状は日本語で仮決めし、UX チームでの承認を待つ）。
 
-## Dependencies
-- Requires access to `FoundationModels` on iOS 18 SDK for availability checks.
-- No external services or network calls introduced.
+## 依存関係
+- iOS 18 SDK の `FoundationModels` フレームワークへのアクセスが必要。
+- 新規の外部サービスやネットワーク通信は導入しない。

@@ -1,23 +1,23 @@
-# Stability Phase 1 Tasks
+# 安定化フェーズ1 タスクリスト
 
-1. **Add availability abstraction**
-   - File: `Infrastructure/FoundationModel/LiveFoundationModelClient.swift`
-   - Introduce `FoundationModelAvailabilityStatus` and refactor availability checks to return `FoundationModelError` without crashing.
-   - Ensure session initialization happens after availability gating.
-   - Write unit tests (new file in `my_traning_appTests`) covering each availability branch.
-2. **Map structured errors in planner**
-   - File: `Domain/Services/AIWorkoutPlanner.swift`
-   - Add helper for translating `FoundationModelError` to localized copy.
-   - Update both `createPlan` and `suggestTodayWorkout` to use the helper and reset generated content on failure.
-   - Extend `AIWorkoutPlannerTests` with cases asserting localized messages for each error type.
-3. **Update Home and Planning UI messaging**
-   - Files: `Presentation/Views/HomeView.swift`, `Presentation/Views/PlanningView.swift`
-   - Display more descriptive error strings and remove duplicate preview in Planning view.
-   - Ensure retry buttons stay disabled while loading.
-4. **Make bundle decoding safe**
-   - Files: `Utilities/Bundle+Decoder.swift`, `Presentation/Views/RecordingView.swift`
-   - Change decoder to throw and add a convenience wrapper that returns `Result`.
-   - Update `RecordingView` to handle failure states with inline messaging.
-   - Add unit tests validating decoder behaviour with missing and malformed data.
-5. **Regression test run**
-   - Execute `swift test` and capture results for the PR.
+1. **利用可否抽象の追加**
+   - 対象ファイル: `Infrastructure/FoundationModel/LiveFoundationModelClient.swift`
+   - `FoundationModelAvailabilityStatus` を導入し、利用可否チェックをクラッシュしない `FoundationModelError` へリファクタリングする。
+   - セッション初期化を利用可否判定後に行えるよう調整する。
+   - `my_traning_appTests` に利用可否分岐を網羅するテストを追加する。
+2. **プランナーでの構造化エラーマッピング**
+   - 対象ファイル: `Domain/Services/AIWorkoutPlanner.swift`
+   - `FoundationModelError` をローカライズ済み文言へ変換するヘルパーを追加する。
+   - `createPlan` と `suggestTodayWorkout` の双方でヘルパーを利用し、失敗時は生成内容をリセットする。
+   - `AIWorkoutPlannerTests` を拡張し、各エラー種別で期待するメッセージを検証する。
+3. **ホーム／プランニング UI のメッセージ更新**
+   - 対象ファイル: `Presentation/Views/HomeView.swift`、`Presentation/Views/PlanningView.swift`
+   - 説明文をより具体的な日本語コピーへ更新し、`PlanningView` の重複プレビューを削除する。
+   - 読み込み中はリトライボタンが無効化される挙動を維持する。
+4. **バンドルデコードの安全化**
+   - 対象ファイル: `Utilities/Bundle+Decoder.swift`、`Presentation/Views/RecordingView.swift`
+   - デコーダーを `throws` 化し、記録画面からは `Result` を通じてエラーを扱えるようにする。
+   - 失敗時に画面でインラインメッセージを表示する実装を追加する。
+   - 欠損データ／不正データを検証するユニットテストを用意する。
+5. **リグレッションテスト実行**
+   - `swift test` を実行し、結果を PR に記録する。
