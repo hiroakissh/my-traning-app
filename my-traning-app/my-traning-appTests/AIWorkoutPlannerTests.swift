@@ -3,20 +3,20 @@ import XCTest
 
 // テスト専用のモッククライアント
 class MockFoundationModelClientForTest: FoundationModelClientProtocol {
-    var shouldThrowError = false
     var planResponse = "Test Plan"
     var suggestionResponse = "Test Suggestion"
+    var errorToThrow: Error?
 
     func generatePlan(prompt: String) async throws -> String {
-        if shouldThrowError {
-            throw FoundationModelError.generationFailed(NSError(domain: "TestError", code: 1, userInfo: nil))
+        if let errorToThrow {
+            throw errorToThrow
         }
         return planResponse
     }
 
     func generateTodaySuggestion(prompt: String) async throws -> String {
-        if shouldThrowError {
-            throw FoundationModelError.generationFailed(NSError(domain: "TestError", code: 2, userInfo: nil))
+        if let errorToThrow {
+            throw errorToThrow
         }
         return suggestionResponse
     }
@@ -45,7 +45,6 @@ final class AIWorkoutPlannerTests: XCTestCase {
 
     func test_createPlan_success() async {
         // Given
-        mockClient.shouldThrowError = false
         let expectedPlan = "Test Plan"
         mockClient.planResponse = expectedPlan
 
@@ -60,7 +59,7 @@ final class AIWorkoutPlannerTests: XCTestCase {
 
     func test_createPlan_failure() async {
         // Given
-        mockClient.shouldThrowError = true
+        mockClient.errorToThrow = FoundationModelError.generationFailed(NSError(domain: "TestError", code: 1, userInfo: nil))
 
         // When
         await planner.createPlan(userProfile: dummyProfile, goal: "Test Goal")
@@ -75,7 +74,6 @@ final class AIWorkoutPlannerTests: XCTestCase {
 
     func test_suggestTodayWorkout_success() async {
         // Given
-        mockClient.shouldThrowError = false
         let expectedSuggestion = "Test Suggestion"
         mockClient.suggestionResponse = expectedSuggestion
 
@@ -90,8 +88,8 @@ final class AIWorkoutPlannerTests: XCTestCase {
 
     func test_suggestTodayWorkout_failure() async {
         // Given
-        mockClient.shouldThrowError = true
-
+        mockClient.errorToThrow = FoundationModelError.generationFailed(NSError(domain: "TestError", code: 2, userInfo: nil))
+        
         // When
         await planner.suggestTodayWorkout(prompt: "Test Prompt")
 
@@ -99,5 +97,52 @@ final class AIWorkoutPlannerTests: XCTestCase {
         XCTAssertFalse(planner.isLoading, "isLoading should be false after completion")
         XCTAssertNotNil(planner.errorMessage, "errorMessage should not be nil on failure")
         XCTAssertTrue(planner.todaySuggestion.isEmpty, "todaySuggestion should be empty on failure")
+    }
+
+    func test_suggestTodayWorkout_deviceNotEligibleErrorShowsLocalizedMessage() async {
+        // Given
+        mockClient.errorToThrow = FoundationModelError.unavailable(.deviceNotEligible)
+
+        // When
+        await planner.suggestTodayWorkout(prompt: "Test Prompt")
+
+        // Then
+        XCTAssertEqual(planner.errorMessage, "このデバイスではApple Intelligenceを利用できません。")
+        XCTAssertTrue(planner.todaySuggestion.isEmpty)
+    }
+
+    func test_createPlan_appleIntelligenceNotEnabledShowsGuidance() async {
+        // Given
+        mockClient.errorToThrow = FoundationModelError.unavailable(.appleIntelligenceNotEnabled)
+
+        // When
+        await planner.createPlan(userProfile: dummyProfile, goal: "Test Goal")
+
+        // Then
+        XCTAssertEqual(planner.errorMessage, "設定アプリからApple Intelligenceを有効にして再度お試しください。")
+        XCTAssertTrue(planner.generatedPlan.isEmpty)
+    }
+
+    func test_createPlan_modelNotReadyShowsRetryMessage() async {
+        // Given
+        mockClient.errorToThrow = FoundationModelError.unavailable(.modelNotReady)
+
+        // When
+        await planner.createPlan(userProfile: dummyProfile, goal: "Test Goal")
+
+        // Then
+        XCTAssertEqual(planner.errorMessage, "Apple Intelligenceの準備中です。ダウンロード完了後にもう一度お試しください。")
+        XCTAssertTrue(planner.generatedPlan.isEmpty)
+    }
+
+    func test_suggestTodayWorkout_sessionUnavailableShowsRecoveryMessage() async {
+        // Given
+        mockClient.errorToThrow = FoundationModelError.sessionUnavailable
+
+        // When
+        await planner.suggestTodayWorkout(prompt: "Test Prompt")
+
+        // Then
+        XCTAssertEqual(planner.errorMessage, "AIセッションを初期化できませんでした。デバイスの状態を確認してから再試行してください。")
     }
 }

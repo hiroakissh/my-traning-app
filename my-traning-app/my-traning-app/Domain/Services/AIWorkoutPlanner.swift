@@ -41,12 +41,13 @@ class AIWorkoutPlanner: ObservableObject {
             let plan = try await foundationModelClient.generatePlan(prompt: prompt)
             self.generatedPlan = plan
         } catch {
-            self.errorMessage = "プランの生成に失敗しました: \(error.localizedDescription)"
+            self.errorMessage = mapError(error)
+            self.generatedPlan = ""
         }
-        
+
         isLoading = false
     }
-    
+
     func suggestTodayWorkout(prompt: String) async {
         isLoading = true
         errorMessage = nil
@@ -56,10 +57,27 @@ class AIWorkoutPlanner: ObservableObject {
             let suggestion = try await foundationModelClient.generateTodaySuggestion(prompt: prompt)
             self.todaySuggestion = suggestion
         } catch {
-            self.errorMessage = "提案の生成に失敗しました: \(error.localizedDescription)"
+            self.errorMessage = mapError(error)
+            self.todaySuggestion = ""
         }
-        
+
         isLoading = false
+    }
+
+    private func mapError(_ error: Error) -> String {
+        if let foundationError = error as? FoundationModelError {
+            switch foundationError {
+            case .unavailable(let status):
+                return status.guidanceMessage
+            case .sessionUnavailable:
+                return "AIセッションを初期化できませんでした。デバイスの状態を確認してから再試行してください。"
+            case .generationFailed(let underlyingError):
+                return "AIからの応答生成に失敗しました。時間を置いて再度お試しください。（詳細: \(underlyingError.localizedDescription))"
+            }
+        }
+
+        let nsError = error as NSError
+        return "想定外のエラーが発生しました。（コード: \(nsError.code))"
     }
 }
 
