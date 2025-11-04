@@ -52,9 +52,17 @@ struct HomeView: View {
                     Section(header: Text("AIアシスタント").font(.title2).bold()) {
                         // エラーメッセージの表示
                         if let errorMessage = planner.errorMessage {
-                            Text(errorMessage)
-                                .foregroundColor(.red)
-                                .font(.caption)
+                            HStack(alignment: .top, spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundColor(.orange)
+                                Text(errorMessage)
+                                    .font(.caption)
+                                    .foregroundColor(.primary)
+                                    .multilineTextAlignment(.leading)
+                            }
+                            .padding(8)
+                            .background(Color(.systemOrange).opacity(0.15))
+                            .cornerRadius(8)
                         }
 
                         // AIからの返信を表示するエリア

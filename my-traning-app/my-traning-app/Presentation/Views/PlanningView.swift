@@ -1,7 +1,5 @@
 import SwiftUI
 
-import SwiftUI
-
 struct PlanningView: View {
     // AIプランナーをViewの状態として監視
     @StateObject private var planner = AIWorkoutPlanner()
@@ -18,9 +16,15 @@ struct PlanningView: View {
                         .padding()
                 } else if let errorMessage = planner.errorMessage {
                     // エラーメッセージの表示
-                    Text(errorMessage)
-                        .foregroundColor(.red)
-                        .padding()
+                    VStack(spacing: 12) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.largeTitle)
+                            .foregroundColor(.orange)
+                        Text(errorMessage)
+                            .multilineTextAlignment(.center)
+                            .foregroundColor(.primary)
+                    }
+                    .padding()
                 } else if !planner.generatedPlan.isEmpty {
                     // 生成されたプランの表示
                     ScrollView {
@@ -67,12 +71,6 @@ struct PlanningView: View {
         }
     }
 }
-
-#Preview {
-    PlanningView()
-}
-
-
 
 #Preview {
     PlanningView()
