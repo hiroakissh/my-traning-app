@@ -1,16 +1,46 @@
-//
-//  my_traning_appTests.swift
-//  my-traning-appTests
-//
-//  Created by HiroakiSaito on 2025/08/31.
-//
+import XCTest
+@testable import my_traning_app
 
-import Testing
+final class WorkoutMenuDecodingTests: XCTestCase {
 
-struct my_traning_appTests {
+    func test_decodeWorkoutDataFromInlineJSON() throws {
+        let json = """
+        {
+            "workout_menus": [
+                {
+                    "muscle_group": "Chest",
+                    "menus": [
+                        {
+                            "name": "Bench Press",
+                            "description": "Classic chest exercise",
+                            "equipment": "Barbell"
+                        },
+                        {
+                            "name": "Push Up",
+                            "description": "Bodyweight push exercise",
+                            "equipment": "None"
+                        }
+                    ]
+                }
+            ]
+        }
+        """
 
-    @Test func example() async throws {
-        // Write your test here and use APIs like `#expect(...)` to check expected conditions.
+        let data = Data(json.utf8)
+        let decoded: WorkoutData = try Bundle.decode(WorkoutData.self, from: data, fileName: "inline.json")
+
+        XCTAssertEqual(decoded.workoutMenus.count, 1)
+        let group = try XCTUnwrap(decoded.workoutMenus.first)
+        XCTAssertEqual(group.muscleGroup, "Chest")
+        XCTAssertEqual(group.menus.count, 2)
+        let firstMenu = try XCTUnwrap(group.menus.first)
+        XCTAssertEqual(firstMenu.name, "Bench Press")
+        XCTAssertEqual(firstMenu.description, "Classic chest exercise")
+        XCTAssertEqual(firstMenu.equipment, "Barbell")
     }
 
+    func test_bundleDecodingErrorProvidesLocalizedDescription() {
+        let error = BundleDecodingError.dataReadFailed(file: "sample.json", reason: "Permission denied")
+        XCTAssertEqual(error.errorDescription, "sample.jsonの読み込みに失敗しました: Permission denied")
+    }
 }

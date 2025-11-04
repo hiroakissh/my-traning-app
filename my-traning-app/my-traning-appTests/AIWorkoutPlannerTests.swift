@@ -70,6 +70,30 @@ final class AIWorkoutPlannerTests: XCTestCase {
         XCTAssertTrue(planner.generatedPlan.isEmpty, "generatedPlan should be empty on failure")
     }
 
+    func test_createPlan_unavailableUnknownReasonIncludesDetails() async {
+        // Given
+        mockClient.errorToThrow = FoundationModelError.unavailable(.unknown(reason: "Maintenance"))
+
+        // When
+        await planner.createPlan(userProfile: dummyProfile, goal: "Test Goal")
+
+        // Then
+        XCTAssertEqual(planner.errorMessage, "AIモデルが現在利用できません。時間を置いて再度お試しください。（詳細: Maintenance)")
+        XCTAssertTrue(planner.generatedPlan.isEmpty)
+    }
+
+    func test_createPlan_unexpectedNSErrorShowsFallbackMessage() async {
+        // Given
+        mockClient.errorToThrow = NSError(domain: "Test", code: 404, userInfo: nil)
+
+        // When
+        await planner.createPlan(userProfile: dummyProfile, goal: "Test Goal")
+
+        // Then
+        XCTAssertEqual(planner.errorMessage, "想定外のエラーが発生しました。（コード: 404)")
+        XCTAssertTrue(planner.generatedPlan.isEmpty)
+    }
+
     // MARK: - suggestTodayWorkout Tests
 
     func test_suggestTodayWorkout_success() async {
@@ -89,7 +113,7 @@ final class AIWorkoutPlannerTests: XCTestCase {
     func test_suggestTodayWorkout_failure() async {
         // Given
         mockClient.errorToThrow = FoundationModelError.generationFailed(NSError(domain: "TestError", code: 2, userInfo: nil))
-        
+
         // When
         await planner.suggestTodayWorkout(prompt: "Test Prompt")
 

@@ -12,6 +12,18 @@ final class BundleDecoderTests: XCTestCase {
         }
     }
 
+    func test_decode_validDataReturnsDecodedValue() throws {
+        struct DummyDecodable: Decodable, Equatable {
+            let value: String
+        }
+
+        let json = """
+        {"value":"success"}
+        """
+        let decoded = try Bundle.decode(DummyDecodable.self, from: Data(json.utf8), fileName: "dummy.json")
+        XCTAssertEqual(decoded, DummyDecodable(value: "success"))
+    }
+
     func test_decode_invalidDataThrowsDecodingFailedError() {
         struct DummyDecodable: Decodable {
             let value: String
