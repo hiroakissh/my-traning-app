@@ -27,7 +27,7 @@ jobs:
           xcodebuild \
             -project my-traning-app/my-traning-app.xcodeproj \
             -scheme "my-traning-app" \
-            -destination 'platform=iOS Simulator,OS=17.5,name=iPhone 15' \
+            -destination 'platform=iOS Simulator,OS=latest,name=iPhone 15' \
             -enableCodeCoverage YES \
             clean test
 
