@@ -13,15 +13,35 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select latest available Xcode
+      - name: Select Xcode with iOS simulator runtime
         run: |
           set -euo pipefail
-          latest_xcode=$(ls -1 /Applications | grep -E '^Xcode(_[0-9]+(\.[0-9]+)*)?\.app$' | sort -V | tail -n 1 || true)
-          if [ -z "${latest_xcode}" ]; then
-            latest_xcode="Xcode.app"
+          candidates=$(ls -1 /Applications | grep -E '^Xcode.*\.app$' | sort -Vr || true)
+          if [ -z "${candidates}" ]; then
+            echo "No Xcode installations found under /Applications" >&2
+            exit 1
           fi
-          sudo xcode-select -s "/Applications/${latest_xcode}/Contents/Developer"
-          echo "Selected ${latest_xcode}"
+          selected=""
+          IFS=$'\n'
+          for xcode in ${candidates}; do
+            dev_dir="/Applications/${xcode}/Contents/Developer"
+            if [ ! -x "${dev_dir}/usr/bin/xcodebuild" ]; then
+              continue
+            fi
+            if DEVELOPER_DIR="${dev_dir}" "${dev_dir}/usr/bin/xcodebuild" -showsdks | grep -q "iphonesimulator"; then
+              selected="${xcode}"
+              break
+            else
+              echo "Skipping ${xcode} (iphonesimulator SDK not installed)"
+            fi
+          done
+          unset IFS
+          if [ -z "${selected}" ]; then
+            echo "No Xcode bundle with an iOS simulator runtime was found." >&2
+            exit 1
+          fi
+          sudo xcode-select -s "/Applications/${selected}/Contents/Developer"
+          echo "Selected ${selected}"
           xcodebuild -version
 
       - name: Resolve Swift packages
