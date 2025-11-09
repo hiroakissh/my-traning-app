@@ -27,17 +27,33 @@ jobs:
       - name: Resolve Swift packages
         run: xcodebuild -resolvePackageDependencies -project my-traning-app/my-traning-app.xcodeproj
 
+      - name: Show available simulators
+        run: xcrun simctl list devices available
+
       - name: Pick available simulator
         run: |
           set -euo pipefail
-          DEVICE_LINE=$(xcrun simctl list devices available | grep -m 1 "iPhone" || true)
-          if [ -z "${DEVICE_LINE}" ]; then
-            echo "No available iPhone simulator found" >&2
+          INFO=$(xcrun simctl list devices available | awk '
+            /^-- iOS / { runtime=$0; sub(/^-- /,"",runtime); sub(/ --$/,"",runtime); next }
+            /^[[:space:]]+iPhone/ && runtime != "" {
+              name=$0
+              sub(/^[[:space:]]+/,"",name)
+              sub(/ \(.*$/,"",name)
+              print runtime "||" name
+              exit
+            }')
+          if [ -z "${INFO}" ]; then
+            echo "No available iOS iPhone simulator found" >&2
             exit 1
           fi
-          DEVICE_NAME=$(echo "${DEVICE_LINE}" | sed -E 's/^[[:space:]]*([^()]+).*/\1/' | xargs)
-          echo "Using simulator: ${DEVICE_NAME}"
-          echo "DESTINATION=platform=iOS Simulator,name=${DEVICE_NAME}" >> "${GITHUB_ENV}"
+          RUNTIME=${INFO%%||*}
+          DEVICE_NAME=${INFO##*||}
+          OS_VERSION=$(printf '%s\n' "${RUNTIME}" | sed -n 's/^iOS //p')
+          if [ -z "${OS_VERSION}" ]; then
+            OS_VERSION="latest"
+          fi
+          echo "Using simulator: ${DEVICE_NAME} (iOS ${OS_VERSION})"
+          echo "DESTINATION=platform=iOS Simulator,OS=${OS_VERSION},name=${DEVICE_NAME}" >> "${GITHUB_ENV}"
 
       - name: Run unit tests with coverage
         run: |
