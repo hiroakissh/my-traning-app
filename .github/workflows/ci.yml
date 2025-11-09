@@ -40,13 +40,18 @@ jobs:
       - name: Ensure iOS simulator runtime is installed
         run: |
           set -euo pipefail
-          if xcrun simctl list runtimes | grep -q "iOS .* (available)"; then
+          has_ios_runtime() {
+            xcrun simctl list runtimes | grep -q "com\.apple\.CoreSimulator\.SimRuntime\.iOS"
+          }
+          if has_ios_runtime; then
             echo "An iOS simulator runtime is already available."
             exit 0
           fi
           echo "Downloading iOS simulator runtime for ${XCODE_APP_PATH}"
           sudo xcodebuild -downloadPlatform iOS
-          if ! xcrun simctl list runtimes | grep -q "iOS .* (available)"; then
+          if ! has_ios_runtime; then
+            echo "iOS simulator runtime still missing after download. Listing runtimes:" >&2
+            xcrun simctl list runtimes >&2
             echo "iOS simulator runtime still missing after download." >&2
             exit 1
           fi
