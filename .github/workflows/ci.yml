@@ -27,12 +27,24 @@ jobs:
       - name: Resolve Swift packages
         run: xcodebuild -resolvePackageDependencies -project my-traning-app/my-traning-app.xcodeproj
 
+      - name: Pick available simulator
+        run: |
+          set -euo pipefail
+          DEVICE_LINE=$(xcrun simctl list devices available | grep -m 1 "iPhone" || true)
+          if [ -z "${DEVICE_LINE}" ]; then
+            echo "No available iPhone simulator found" >&2
+            exit 1
+          fi
+          DEVICE_NAME=$(echo "${DEVICE_LINE}" | sed -E 's/^[[:space:]]*([^()]+).*/\1/' | xargs)
+          echo "Using simulator: ${DEVICE_NAME}"
+          echo "DESTINATION=platform=iOS Simulator,name=${DEVICE_NAME}" >> "${GITHUB_ENV}"
+
       - name: Run unit tests with coverage
         run: |
           xcodebuild \
             -project my-traning-app/my-traning-app.xcodeproj \
             -scheme "my-traning-app" \
-            -destination 'platform=iOS Simulator,OS=latest,name=iPhone 15' \
+            -destination "${{ env.DESTINATION }}" \
             -enableCodeCoverage YES \
             clean test
 
