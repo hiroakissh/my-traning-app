@@ -25,15 +25,20 @@ jobs:
           IFS=$'\n'
           for xcode in ${candidates}; do
             dev_dir="/Applications/${xcode}/Contents/Developer"
-            if [ ! -x "${dev_dir}/usr/bin/xcodebuild" ]; then
+            xcodebuild_bin="${dev_dir}/usr/bin/xcodebuild"
+            if [ ! -x "${xcodebuild_bin}" ]; then
               continue
             fi
-            if DEVELOPER_DIR="${dev_dir}" "${dev_dir}/usr/bin/xcodebuild" -showsdks | grep -q "iphonesimulator"; then
-              selected="${xcode}"
-              break
-            else
-              echo "Skipping ${xcode} (iphonesimulator SDK not installed)"
+            if ! DEVELOPER_DIR="${dev_dir}" "${xcodebuild_bin}" -showsdks | grep -q "iphonesimulator"; then
+              echo "Skipping ${xcode} (iphonesimulator SDK not listed)"
+              continue
             fi
+            if ! DEVELOPER_DIR="${dev_dir}" /usr/bin/xcrun simctl list runtimes | grep -q "iOS .* (available)"; then
+              echo "Skipping ${xcode} (no available iOS simulator runtime)"
+              continue
+            fi
+            selected="${xcode}"
+            break
           done
           unset IFS
           if [ -z "${selected}" ]; then
