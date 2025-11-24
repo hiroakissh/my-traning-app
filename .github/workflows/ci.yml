@@ -34,51 +34,51 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PY'
-          import json, os, subprocess, sys
+import json, os, subprocess, sys
 
-          def version_tuple(v: str):
-              try:
-                  return tuple(int(p) for p in v.split('.'))
-              except Exception:
-                  return ()
+def version_tuple(v: str):
+    try:
+        return tuple(int(p) for p in v.split('.'))
+    except Exception:
+        return ()
 
-          raw = subprocess.check_output(["xcrun", "simctl", "list", "devices", "available", "-j"], text=True)
-          data = json.loads(raw)
+raw = subprocess.check_output(["xcrun", "simctl", "list", "devices", "available", "-j"], text=True)
+data = json.loads(raw)
 
-          preferred = []
-          fallback_26 = []
-          any_ios = []
+preferred = []
+fallback_26 = []
+any_ios = []
 
-          for runtime, devices in data.get("devices", {}).items():
-              if "com.apple.CoreSimulator.SimRuntime.iOS" not in runtime:
-                  continue
-              ver = runtime.rsplit('.', 1)[-1].replace('-', '.')
-              vtuple = version_tuple(ver)
-              for dev in devices:
-                  if not dev.get("isAvailable"):
-                      continue
-                  name = dev.get("name", "")
-                  entry = (vtuple, ver, name)
-                  if name.startswith("iPhone 17"):
-                      preferred.append(entry)
-                  if ver.startswith("26."):
-                      fallback_26.append(entry)
-                  any_ios.append(entry)
+for runtime, devices in data.get("devices", {}).items():
+    if "com.apple.CoreSimulator.SimRuntime.iOS" not in runtime:
+        continue
+    ver = runtime.rsplit('.', 1)[-1].replace('-', '.')
+    vtuple = version_tuple(ver)
+    for dev in devices:
+        if not dev.get("isAvailable"):
+            continue
+        name = dev.get("name", "")
+        entry = (vtuple, ver, name)
+        if name.startswith("iPhone 17"):
+            preferred.append(entry)
+        if ver.startswith("26."):
+            fallback_26.append(entry)
+        any_ios.append(entry)
 
-          def pick_best(entries):
-              if not entries:
-                  return None
-              # sort by version tuple descending, then name for stability
-              return sorted(entries, key=lambda x: (x[0], x[2]), reverse=True)[0]
+def pick_best(entries):
+    if not entries:
+        return None
+    # sort by version tuple descending, then name for stability
+    return sorted(entries, key=lambda x: (x[0], x[2]), reverse=True)[0]
 
-          chosen = pick_best(preferred) or pick_best(fallback_26) or pick_best(any_ios)
-          if not chosen:
-              print("::error title=Runtime detection failed::No available iOS simulators found.", file=sys.stderr)
-              sys.exit(1)
+chosen = pick_best(preferred) or pick_best(fallback_26) or pick_best(any_ios)
+if not chosen:
+    print("::error title=Runtime detection failed::No available iOS simulators found.", file=sys.stderr)
+    sys.exit(1)
 
-          version, version_str, name = chosen
-          print(f"runtime={version_str}")
-          print(f"device_name={name}")
+version, version_str, name = chosen
+print(f"runtime={version_str}")
+print(f"device_name={name}")
 PY
 
       - name: Resolve Swift packages
