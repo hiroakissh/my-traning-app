@@ -24,22 +24,19 @@ jobs:
         id: detect_runtime
         run: |
           set -euo pipefail
-          RUNTIME=$(xcrun simctl list runtimes | awk '
-            /com\.apple\.CoreSimulator\.SimRuntime\.iOS-26-/ {
-              if (match($0, /\(([0-9.]+) -/, m)) { print m[1]; exit }
-              if (match($0, /iOS ([0-9.]+)/, m)) { print m[1]; exit }
-            }')
+          RUNTIME=$(xcrun simctl list devices available \
+            | awk '/iPhone 17/ && /OS:/{ if (match($0, /OS:([0-9.]+)/, m)) { print m[1]; exit }}')
           if [ -z "${RUNTIME}" ]; then
-            RUNTIME=$(xcrun simctl list runtimes | awk '
-              /com\.apple\.CoreSimulator\.SimRuntime\.iOS-18-6/ {
-                if (match($0, /\(([0-9.]+) -/, m)) { print m[1]; exit }
-                if (match($0, /iOS ([0-9.]+)/, m)) { print m[1]; exit }
-              }')
+            # Fallback: pick first iOS 26.x runtime version
+            RUNTIME=$(xcrun simctl list runtimes \
+              | sed -n 's/.*iOS \([0-9][0-9.]*\).*/\1/p' \
+              | grep '^26\.' \
+              | head -n1)
           fi
           if [ -z "${RUNTIME}" ]; then
-            echo "No supported iOS runtime (26.x preferred, fallback 18.6) is available on this runner." >&2
-            xcrun simctl list runtimes >&2
-            exit 1
+            # Final fallback to a fixed, widely available runtime version on current runners.
+            RUNTIME="26.0.1"
+            echo "::warning title=Runtime fallback::Using fallback runtime version ${RUNTIME} because no matching iPhone 17 device or iOS 26.x runtime was detected."
           fi
           echo "runtime=${RUNTIME}" >> "${GITHUB_OUTPUT}"
 
