@@ -7,79 +7,64 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: macos-15
+    runs-on: macos-26
 
     steps:
-      - name: Checkout
+      - name: コードをチェックアウト
         uses: actions/checkout@v4
 
-      - name: Locate Xcode 26 series
+      - name: Xcode 26 を選択
         run: |
           set -euo pipefail
-          candidates=$(ls -1 /Applications | grep -E '^Xcode_26.*\.app$' | sort -Vr || true)
-          if [ -z "${candidates}" ]; then
-            echo "Xcode 26 series not found under /Applications" >&2
-            ls -1 /Applications || true
-            exit 1
-          fi
-          selected=$(echo "${candidates}" | head -n 1)
-          path="/Applications/${selected}"
-          echo "Using ${path}"
-          {
-            echo "XCODE_APP_PATH=${path}"
-            echo "DEVELOPER_DIR=${path}/Contents/Developer"
-          } >> "${GITHUB_ENV}"
-
-      - name: Select desired Xcode
-        run: |
-          set -euo pipefail
-          sudo xcode-select -s "${DEVELOPER_DIR}"
-          echo "Selected ${XCODE_APP_PATH}"
+          sudo xcode-select -s "/Applications/Xcode.app/Contents/Developer"
+          echo "選択中の Xcode: $(xcode-select -p)"
           xcodebuild -version
 
-      - name: Ensure iOS simulator runtime is installed
+      - name: iOS ランタイムを検出
+        id: detect_runtime
         run: |
           set -euo pipefail
-          has_ios_runtime() {
-            xcrun simctl list runtimes | grep -q "com\.apple\.CoreSimulator\.SimRuntime\.iOS"
-          }
-          if has_ios_runtime; then
-            echo "An iOS simulator runtime is already available."
+          RUNTIME_26=$(xcrun simctl list runtimes | grep -E "iOS 26" || true)
+          if [ -n "${RUNTIME_26}" ]; then
+            echo "runtime=26.0" >> "${GITHUB_OUTPUT}"
             exit 0
           fi
-          echo "Downloading iOS simulator runtime for ${XCODE_APP_PATH}"
-          sudo xcodebuild -downloadPlatform iOS
-          if ! has_ios_runtime; then
-            echo "iOS simulator runtime still missing after download. Listing runtimes:" >&2
-            xcrun simctl list runtimes >&2
-            echo "iOS simulator runtime still missing after download." >&2
-            exit 1
+          RUNTIME_25=$(xcrun simctl list runtimes | grep -E "iOS 25" || true)
+          if [ -n "${RUNTIME_25}" ]; then
+            echo "runtime=25.0" >> "${GITHUB_OUTPUT}"
+            exit 0
           fi
+          echo "このランナーで利用可能な iOS 26 / 25 ランタイムが見つかりません。" >&2
+          xcrun simctl list runtimes >&2
+          exit 1
 
-      - name: Resolve Swift packages
+      - name: Swift パッケージを解決
         run: xcodebuild -resolvePackageDependencies -project my-traning-app/my-traning-app.xcodeproj
 
-      - name: Show available runtimes
+      - name: 取得したランタイムを表示
         run: xcrun simctl list runtimes
 
-      - name: Show available simulators
+      - name: 利用可能なシミュレータを表示
         run: xcrun simctl list devices available
 
-      - name: Run unit tests with coverage
+      - name: カバレッジ付きユニットテストを実行
         run: |
+          RUNTIME_VERSION="${{ steps.detect_runtime.outputs.runtime }}"
+          DEVICE_NAME="iPhone 15"
+          echo "使用するシミュレータ: ${DEVICE_NAME} (iOS ${RUNTIME_VERSION})"
           xcodebuild \
             -project my-traning-app/my-traning-app.xcodeproj \
             -scheme "my-traning-app" \
-            -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.5' \
+            -destination "platform=iOS Simulator,name=${DEVICE_NAME},OS=${RUNTIME_VERSION}" \
             -enableCodeCoverage YES \
             clean test
 
-      - name: Show coverage summary
+      - name: カバレッジサマリを表示
         run: |
           RESULT_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name '*.xcresult' -print | head -n 1)
           if [ -n "$RESULT_PATH" ]; then
             xcrun xccov view --report "$RESULT_PATH"
           else
-            echo "xcresult not found"
+            echo "xcresult が見つかりません"
             exit 1
           fi
