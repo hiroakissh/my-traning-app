@@ -24,17 +24,12 @@ jobs:
         id: detect_runtime
         run: |
           set -euo pipefail
-          RUNTIME_26=$(xcrun simctl list runtimes | grep -E "iOS 26" || true)
-          if [ -n "${RUNTIME_26}" ]; then
-            echo "runtime=26.0" >> "${GITHUB_OUTPUT}"
+          TARGET_RUNTIME="iOS 26.0.1"
+          if xcrun simctl list runtimes | grep -F "${TARGET_RUNTIME}" >/dev/null; then
+            echo "runtime=26.0.1" >> "${GITHUB_OUTPUT}"
             exit 0
           fi
-          RUNTIME_25=$(xcrun simctl list runtimes | grep -E "iOS 25" || true)
-          if [ -n "${RUNTIME_25}" ]; then
-            echo "runtime=25.0" >> "${GITHUB_OUTPUT}"
-            exit 0
-          fi
-          echo "No iOS 26 / 25 runtime is available on this runner." >&2
+          echo "Required runtime ${TARGET_RUNTIME} is not available on this runner." >&2
           xcrun simctl list runtimes >&2
           exit 1
 
@@ -50,7 +45,7 @@ jobs:
       - name: Run unit tests with coverage
         run: |
           RUNTIME_VERSION="${{ steps.detect_runtime.outputs.runtime }}"
-          DEVICE_NAME="iPhone 15"
+          DEVICE_NAME="iPhone 17"
           echo "Running on simulator: ${DEVICE_NAME} (iOS ${RUNTIME_VERSION})"
           xcodebuild \
             -project my-traning-app/my-traning-app.xcodeproj \
