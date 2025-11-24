@@ -14,7 +14,7 @@ class AIWorkoutPlanner: ObservableObject {
     @Published var errorMessage: String? = nil
     
     // DI (依存性注入) を可能にするイニシャライザ
-    init(foundationModelClient: FoundationModelClientProtocol = LiveFoundationModelClient()) {
+    init(foundationModelClient: FoundationModelClientProtocol = FoundationModelClientFactory.make()) {
         self.foundationModelClient = foundationModelClient
     }
     

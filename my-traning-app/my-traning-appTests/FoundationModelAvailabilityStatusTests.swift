@@ -2,6 +2,7 @@ import XCTest
 import FoundationModels
 @testable import my_traning_app
 
+@available(iOS 26.0, *)
 final class FoundationModelAvailabilityStatusTests: XCTestCase {
 
     func test_initFromAvailability_deviceNotEligible() {

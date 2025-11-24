@@ -1,7 +1,18 @@
 import Foundation
 import FoundationModels
 
+enum FoundationModelClientFactory {
+    static func make() -> FoundationModelClientProtocol {
+        if #available(iOS 26.0, *) {
+            return LiveFoundationModelClient()
+        } else {
+            return UnavailableFoundationModelClient()
+        }
+    }
+}
+
 // 本番用のAPIクライアント
+@available(iOS 26.0, *)
 class LiveFoundationModelClient: FoundationModelClientProtocol {
     private var session: LanguageModelSession?
     private let systemModelProvider: () -> SystemLanguageModel
@@ -59,6 +70,7 @@ enum FoundationModelAvailabilityStatus: Equatable {
     case modelNotReady
     case unknown(reason: String)
 
+    @available(iOS 26.0, *)
     init(from availability: SystemLanguageModel.Availability) {
         switch availability {
         case .available:
@@ -104,4 +116,15 @@ enum FoundationModelError: Error {
     case unavailable(FoundationModelAvailabilityStatus)
     case sessionUnavailable
     case generationFailed(Error)
+}
+
+/// 26.0未満のOSではApple Intelligenceが利用できないため、明示的にエラーを返すクライアント
+class UnavailableFoundationModelClient: FoundationModelClientProtocol {
+    func generatePlan(prompt: String) async throws -> String {
+        throw FoundationModelError.unavailable(.deviceNotEligible)
+    }
+
+    func generateTodaySuggestion(prompt: String) async throws -> String {
+        throw FoundationModelError.unavailable(.deviceNotEligible)
+    }
 }
