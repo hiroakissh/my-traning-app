@@ -24,23 +24,53 @@ jobs:
         id: detect_runtime
         run: |
           set -euo pipefail
-          RUNTIME=$(xcrun simctl list devices available \
-            | grep "iPhone 17" \
-            | head -n1 \
-            | sed -n 's/.*OS:\([0-9.]*\).*/\1/p')
-          if [ -z "${RUNTIME}" ]; then
-            # Fallback: pick first iOS 26.x runtime version
-            RUNTIME=$(xcrun simctl list runtimes \
-              | sed -n 's/.*iOS \([0-9][0-9.]*\).*/\1/p' \
-              | grep '^26\.' \
-              | head -n1)
-          fi
-          if [ -z "${RUNTIME}" ]; then
-            # Final fallback to a fixed, widely available runtime version on current runners.
-            RUNTIME="26.0.1"
-            echo "::warning title=Runtime fallback::Using fallback runtime version ${RUNTIME} because no matching iPhone 17 device or iOS 26.x runtime was detected."
-          fi
-          echo "runtime=${RUNTIME}" >> "${GITHUB_OUTPUT}"
+          python - <<'PY'
+import json, os, subprocess, sys
+
+def version_tuple(v: str):
+    try:
+        return tuple(int(p) for p in v.split('.'))
+    except Exception:
+        return ()
+
+raw = subprocess.check_output(["xcrun", "simctl", "list", "devices", "available", "-j"], text=True)
+data = json.loads(raw)
+
+preferred = []
+fallback_26 = []
+any_ios = []
+
+for runtime, devices in data.get("devices", {}).items():
+    if "com.apple.CoreSimulator.SimRuntime.iOS" not in runtime:
+        continue
+    ver = runtime.rsplit('.', 1)[-1].replace('-', '.')
+    vtuple = version_tuple(ver)
+    for dev in devices:
+        if not dev.get("isAvailable"):
+            continue
+        name = dev.get("name", "")
+        entry = (vtuple, ver, name)
+        if name.startswith("iPhone 17"):
+            preferred.append(entry)
+        if ver.startswith("26."):
+            fallback_26.append(entry)
+        any_ios.append(entry)
+
+def pick_best(entries):
+    if not entries:
+        return None
+    # sort by version tuple descending, then name for stability
+    return sorted(entries, key=lambda x: (x[0], x[2]), reverse=True)[0]
+
+chosen = pick_best(preferred) or pick_best(fallback_26) or pick_best(any_ios)
+if not chosen:
+    print("::error title=Runtime detection failed::No available iOS simulators found.", file=sys.stderr)
+    sys.exit(1)
+
+version, version_str, name = chosen
+print(f"runtime={version_str}")
+print(f"device_name={name}")
+PY
 
       - name: Resolve Swift packages
         run: xcodebuild -resolvePackageDependencies -project my-traning-app/my-traning-app.xcodeproj
@@ -54,7 +84,7 @@ jobs:
       - name: Run unit tests with coverage
         run: |
           RUNTIME_VERSION="${{ steps.detect_runtime.outputs.runtime }}"
-          DEVICE_NAME="iPhone 17"
+          DEVICE_NAME="${{ steps.detect_runtime.outputs.device_name }}"
           echo "Running on simulator: ${DEVICE_NAME} (iOS ${RUNTIME_VERSION})"
           xcodebuild \
             -project my-traning-app/my-traning-app.xcodeproj \
