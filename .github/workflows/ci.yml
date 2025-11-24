@@ -65,7 +65,7 @@ jobs:
       - name: Show available simulators
         run: xcrun simctl list devices available
 
-      - name: Pick available simulator
+      - name: Determine test destination
         run: |
           set -euo pipefail
           INFO=$(xcrun simctl list devices available | awk '
@@ -76,22 +76,36 @@ jobs:
               sub(/ \(.*$/,"",name)
               print runtime "||" name
               exit
-            }')
-          if [ -z "${INFO}" ]; then
-            echo "No available iOS iPhone simulator found" >&2
-            exit 1
+            }' || true)
+          if [ -n "${INFO}" ]; then
+            RUNTIME=${INFO%%||*}
+            DEVICE_NAME=${INFO##*||}
+            OS_VERSION=$(printf '%s\n' "${RUNTIME}" | sed -n 's/^iOS //p')
+            if [ -z "${OS_VERSION}" ]; then
+              OS_VERSION="latest"
+            fi
+            DESTINATION="platform=iOS Simulator,OS=${OS_VERSION},name=${DEVICE_NAME}"
+            FRIENDLY="iOS Simulator ${DEVICE_NAME} (iOS ${OS_VERSION})"
+            FALLBACK=0
+          else
+            echo "No iOS simulator runtime is available. Falling back to running tests on macOS." >&2
+            DESTINATION="platform=macOS,arch=arm64"
+            FRIENDLY="macOS (local runner)"
+            FALLBACK=1
           fi
-          RUNTIME=${INFO%%||*}
-          DEVICE_NAME=${INFO##*||}
-          OS_VERSION=$(printf '%s\n' "${RUNTIME}" | sed -n 's/^iOS //p')
-          if [ -z "${OS_VERSION}" ]; then
-            OS_VERSION="latest"
-          fi
-          echo "Using simulator: ${DEVICE_NAME} (iOS ${OS_VERSION})"
-          echo "DESTINATION=platform=iOS Simulator,OS=${OS_VERSION},name=${DEVICE_NAME}" >> "${GITHUB_ENV}"
+          {
+            printf 'DESTINATION=%s\n' "${DESTINATION}"
+            printf 'DESTINATION_FRIENDLY=%s\n' "${FRIENDLY}"
+            printf 'DESTINATION_FALLBACK_TO_MAC=%s\n' "${FALLBACK}"
+          } >> "${GITHUB_ENV}"
+          echo "Selected destination: ${FRIENDLY}"
 
       - name: Run unit tests with coverage
         run: |
+          echo "Running tests on ${DESTINATION_FRIENDLY:-unknown destination}"
+          if [ "${DESTINATION_FALLBACK_TO_MAC:-0}" = "1" ]; then
+            echo "::notice title=Destination fallback::iOS simulator runtime was unavailable. Tests are running on macOS instead." >&2
+          fi
           xcodebuild \
             -project my-traning-app/my-traning-app.xcodeproj \
             -scheme "my-traning-app" \
