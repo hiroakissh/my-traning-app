@@ -43,9 +43,11 @@ jobs:
                   return ()
 
           def normalize_version(raw_version: str) -> str:
-              # Remove leading platform prefix like "iOS." and collapse dashes.
+              # Remove leading platform prefix, drop build metadata in parentheses, collapse dashes/spaces.
               v = raw_version.replace("iOS.", "").replace("ios.", "")
-              return v
+              if "(" in v:
+                  v = v.split("(", 1)[0]
+              return v.replace(" ", "")
 
           raw = subprocess.check_output(
               ["xcrun", "simctl", "list", "devices", "available", "-j"], text=True
