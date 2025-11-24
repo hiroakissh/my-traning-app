@@ -25,7 +25,9 @@ jobs:
         run: |
           set -euo pipefail
           RUNTIME=$(xcrun simctl list devices available \
-            | awk '/iPhone 17/ && /OS:/{ if (match($0, /OS:([0-9.]+)/, m)) { print m[1]; exit }}')
+            | grep "iPhone 17" \
+            | head -n1 \
+            | sed -n 's/.*OS:\([0-9.]*\).*/\1/p')
           if [ -z "${RUNTIME}" ]; then
             # Fallback: pick first iOS 26.x runtime version
             RUNTIME=$(xcrun simctl list runtimes \
