@@ -88,8 +88,8 @@ jobs:
           output = os.environ.get("GITHUB_OUTPUT")
           if output:
               with open(output, "a", encoding="utf-8") as fh:
-                  fh.write(f"runtime={version_str}\\n")
-                  fh.write(f"device_name={name}\\n")
+                  fh.write(f"runtime={version_str}\n")
+                  fh.write(f"device_name={name}\n")
           else:
               print(
                   "::warning::GITHUB_OUTPUT not set; step outputs will be unavailable.",
