@@ -1,7 +1,11 @@
 import SwiftUI
 
 struct HomeView: View {
+    @StateObject private var planner = AIWorkoutPlanner()
     @State private var aiQuery: String = ""
+    
+    // AIへの質問をトリガーするためのState
+    @State private var triggerSuggestion = false
 
     var body: some View {
         NavigationStack {
@@ -44,23 +48,57 @@ struct HomeView: View {
                         .cornerRadius(12)
                     }
 
-                    // 3. AIアシスタントへの入力窓
+                    // 3. AIアシスタント
                     Section(header: Text("AIアシスタント").font(.title2).bold()) {
+                        // エラーメッセージの表示
+                        if let errorMessage = planner.errorMessage {
+                            HStack(alignment: .top, spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundColor(.orange)
+                                Text(errorMessage)
+                                    .font(.caption)
+                                    .foregroundColor(.primary)
+                                    .multilineTextAlignment(.leading)
+                            }
+                            .padding(8)
+                            .background(Color(.systemOrange).opacity(0.15))
+                            .cornerRadius(8)
+                        }
+
+                        // AIからの返信を表示するエリア
+                        if !planner.todaySuggestion.isEmpty {
+                            HStack {
+                                Image(systemName: "sparkle")
+                                    .foregroundColor(.accentColor)
+                                Text(planner.todaySuggestion)
+                            }
+                            .padding()
+                            .background(Color.accentColor.opacity(0.1))
+                            .cornerRadius(12)
+                        }
+                        
                         TextField("今日は忙しいけど何ができる？", text: $aiQuery)
                             .textFieldStyle(.roundedBorder)
-                        Button(action: {}) {
-                            Text("質問する")
-                                .frame(maxWidth: .infinity)
+                            .disabled(planner.isLoading)
+                        
+                        Button(action: { triggerSuggestion = true }) {
+                            if planner.isLoading {
+                                ProgressView()
+                                    .frame(maxWidth: .infinity)
+                            } else {
+                                Text("質問する")
+                                    .frame(maxWidth: .infinity)
+                            }
                         }
                         .buttonStyle(.bordered)
                         .tint(.accentColor)
+                        .disabled(planner.isLoading || aiQuery.isEmpty)
                     }
                 }
                 .padding()
             }
             .navigationTitle("ホーム")
             .toolbar {
-                // 4. 今日のトレーニング記録ボタン (ツールバーに配置)
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {}) {
                         HStack {
@@ -69,6 +107,13 @@ struct HomeView: View {
                         }
                     }
                     .buttonStyle(.borderedProminent)
+                }
+            }
+            // triggerSuggestionがtrueになったら非同期タスクを実行
+            .task(id: triggerSuggestion) {
+                if triggerSuggestion {
+                    await planner.suggestTodayWorkout(prompt: aiQuery)
+                    triggerSuggestion = false
                 }
             }
         }
