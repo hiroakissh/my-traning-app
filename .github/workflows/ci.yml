@@ -42,6 +42,11 @@ jobs:
               except Exception:
                   return ()
 
+          def normalize_version(raw_version: str) -> str:
+              # Remove leading platform prefix like "iOS." and collapse dashes.
+              v = raw_version.replace("iOS.", "").replace("ios.", "")
+              return v
+
           raw = subprocess.check_output(
               ["xcrun", "simctl", "list", "devices", "available", "-j"], text=True
           )
@@ -51,19 +56,35 @@ jobs:
           fallback_26 = []
           any_ios = []
 
+          def device_version(dev: dict, default: str) -> str:
+              candidates = [
+                  dev.get("operatingSystemVersion"),
+                  dev.get("osVersion"),
+                  dev.get("os"),
+                  default,
+              ]
+              for cand in candidates:
+                  if not cand:
+                      continue
+                  cand_str = str(cand).replace(" ", "")
+                  return normalize_version(cand_str)
+              return normalize_version(default)
+
           for runtime, devices in data.get("devices", {}).items():
               if "com.apple.CoreSimulator.SimRuntime.iOS" not in runtime:
                   continue
-              ver = runtime.rsplit(".", 1)[-1].replace("-", ".")
-              vtuple = version_tuple(ver)
+              ver_raw = runtime.rsplit(".", 1)[-1].replace("-", ".")
+              runtime_ver = normalize_version(ver_raw)
               for dev in devices:
                   if not dev.get("isAvailable"):
                       continue
                   name = dev.get("name", "")
-                  entry = (vtuple, ver, name)
+                  dev_ver = device_version(dev, runtime_ver)
+                  vtuple = version_tuple(dev_ver)
+                  entry = (vtuple, dev_ver, name)
                   if name.startswith("iPhone 17"):
                       preferred.append(entry)
-                  if ver.startswith("26."):
+                  if dev_ver.startswith("26."):
                       fallback_26.append(entry)
                   any_ios.append(entry)
 
