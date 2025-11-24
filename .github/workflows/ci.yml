@@ -79,7 +79,7 @@ jobs:
             version, version_str, name = chosen
             print(f"runtime={version_str}")
             print(f"device_name={name}")
-PY
+          PY
 
       - name: Resolve Swift packages
         run: xcodebuild -resolvePackageDependencies -project my-traning-app/my-traning-app.xcodeproj
