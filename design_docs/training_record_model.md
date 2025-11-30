@@ -10,7 +10,7 @@
 | date | Date (日付のみ) | 必須 | セッション日 | `2024-03-01` |
 | startTime | Date (日時) | 任意 | 開始日時。分単位まで | `2024-03-01T07:30:00Z` |
 | endTime | Date (日時) | 任意 | 終了日時。分単位まで | `2024-03-01T08:45:00Z` |
-| sessionDurationSec | Int | 任意 | セッション全体の所要時間（秒）。タイマーから保存 | `4500` |
+| sessionDurationSec | Int | 必須 | セッション全体の所要時間（秒）。タイマー計測 or 手入力で保存 | `4500` |
 | purpose | Enum | 必須 | セッション目的。`refresh`（リフレッシュ）/`hypertrophy`（筋肥大）/`diet`（ダイエット）/`tune`（調整） | `hypertrophy` |
 | condition | Object | 任意 | 当日の体調 | 下記参照 |
 | exercises | Array\<Exercise\> | 必須（空配列可） | 実施した種目一覧 | 下記参照 |
