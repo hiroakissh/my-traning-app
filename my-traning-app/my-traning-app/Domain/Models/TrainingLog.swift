@@ -42,6 +42,12 @@ enum BodyPart: String, Codable, CaseIterable {
     }
 }
 
+enum LogSource: String, Codable, CaseIterable {
+    case timer
+    case manual
+    case imported
+}
+
 // MARK: - Models
 
 @Model
@@ -52,6 +58,7 @@ final class TrainingLog {
     var endTime: Date?
     var sessionDurationSec: Int
     var purpose: TrainingPurpose
+    var source: LogSource
     @Relationship(deleteRule: .cascade) var condition: TrainingCondition?
     @Relationship(deleteRule: .cascade) var exercises: [TrainingExercise]
     var note: String?
@@ -63,6 +70,7 @@ final class TrainingLog {
         endTime: Date? = nil,
         sessionDurationSec: Int,
         purpose: TrainingPurpose,
+        source: LogSource,
         condition: TrainingCondition? = nil,
         exercises: [TrainingExercise] = [],
         note: String? = nil
@@ -73,6 +81,7 @@ final class TrainingLog {
         self.endTime = endTime
         self.sessionDurationSec = sessionDurationSec
         self.purpose = purpose
+        self.source = source
         self.condition = condition
         self.exercises = exercises
         self.note = note
@@ -147,6 +156,7 @@ final class TrainingSet {
     var rpe: Double?
     var restSec: Int?
     var setNote: String?
+    var isWarmup: Bool
 
     @Relationship(inverse: \TrainingExercise.sets) var exercise: TrainingExercise?
 
@@ -157,7 +167,8 @@ final class TrainingSet {
         durationSec: Int? = nil,
         rpe: Double? = nil,
         restSec: Int? = nil,
-        setNote: String? = nil
+        setNote: String? = nil,
+        isWarmup: Bool = false
     ) {
         self.order = order
         self.weightKg = weightKg
@@ -166,5 +177,6 @@ final class TrainingSet {
         self.rpe = rpe
         self.restSec = restSec
         self.setNote = setNote
+        self.isWarmup = isWarmup
     }
 }
