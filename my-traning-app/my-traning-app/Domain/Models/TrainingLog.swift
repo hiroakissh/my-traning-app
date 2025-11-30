@@ -26,6 +26,7 @@ final class TrainingLog {
     var date: Date
     var startTime: Date?
     var endTime: Date?
+    var sessionDurationSec: Int?
     var purpose: TrainingPurpose
     @Relationship(deleteRule: .cascade) var condition: TrainingCondition?
     @Relationship(deleteRule: .cascade) var exercises: [TrainingExercise]
@@ -36,6 +37,7 @@ final class TrainingLog {
         date: Date,
         startTime: Date? = nil,
         endTime: Date? = nil,
+        sessionDurationSec: Int? = nil,
         purpose: TrainingPurpose,
         condition: TrainingCondition? = nil,
         exercises: [TrainingExercise] = [],
@@ -45,6 +47,7 @@ final class TrainingLog {
         self.date = date
         self.startTime = startTime
         self.endTime = endTime
+        self.sessionDurationSec = sessionDurationSec
         self.purpose = purpose
         self.condition = condition
         self.exercises = exercises

@@ -10,6 +10,7 @@
 | date | Date (日付のみ) | 必須 | セッション日 | `2024-03-01` |
 | startTime | Date (日時) | 任意 | 開始日時。分単位まで | `2024-03-01T07:30:00Z` |
 | endTime | Date (日時) | 任意 | 終了日時。分単位まで | `2024-03-01T08:45:00Z` |
+| sessionDurationSec | Int | 任意 | セッション全体の所要時間（秒）。タイマーから保存 | `4500` |
 | purpose | Enum | 必須 | セッション目的。`refresh`（リフレッシュ）/`hypertrophy`（筋肥大）/`diet`（ダイエット）/`tune`（調整） | `hypertrophy` |
 | condition | Object | 任意 | 当日の体調 | 下記参照 |
 | exercises | Array\<Exercise\> | 必須（空配列可） | 実施した種目一覧 | 下記参照 |
@@ -57,6 +58,7 @@
   "date": "2024-03-01",
   "startTime": "2024-03-01T07:30:00Z",
   "endTime": "2024-03-01T08:45:00Z",
+  "sessionDurationSec": 4500,
   "purpose": "hypertrophy",
   "condition": {
     "sleepHours": 6.5,
@@ -98,3 +100,4 @@
 - `purpose`や`category`はEnumで管理しつつ、将来的な拡張も考えて未定義値も保持できる実装にしておくと扱いやすい。
 - `condition`は入力負荷を考え、簡易（1–5レーティングのみ）と詳細（自由記述あり）をUIでトグルできる設計を想定。
 - 自由入力が多い項目はサジェスト履歴を利用し、入力の手間と揺れを減らす。
+- 週次集計（目的別総時間・総ボリューム、部位別ボリューム推移、種目別重量/回数推移）を想定し、`sessionDurationSec`と`bodyPart`、各セットの`weightKg`/`reps`から計算できる形を維持する。
