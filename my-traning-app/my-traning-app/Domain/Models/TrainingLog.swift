@@ -18,6 +18,30 @@ enum ExerciseCategory: String, Codable, CaseIterable {
     case other
 }
 
+enum BodyPart: String, Codable, CaseIterable {
+    case chest
+    case back
+    case legs
+    case shoulder
+    case arms
+    case core
+    case fullBody
+    case other
+
+    var displayName: String {
+        switch self {
+        case .chest: "胸"
+        case .back: "背中"
+        case .legs: "脚"
+        case .shoulder: "肩"
+        case .arms: "腕"
+        case .core: "体幹"
+        case .fullBody: "全身"
+        case .other: "その他"
+        }
+    }
+}
+
 // MARK: - Models
 
 @Model
@@ -87,7 +111,7 @@ final class TrainingCondition {
 final class TrainingExercise {
     @Attribute(.unique) var id: UUID
     var name: String
-    var bodyPart: String?
+    var bodyPart: BodyPart
     var category: ExerciseCategory
     @Relationship(deleteRule: .cascade) var sets: [TrainingSet]
     var note: String?
@@ -97,7 +121,7 @@ final class TrainingExercise {
     init(
         id: UUID = UUID(),
         name: String,
-        bodyPart: String? = nil,
+        bodyPart: BodyPart = .other,
         category: ExerciseCategory = .strength,
         sets: [TrainingSet] = [],
         note: String? = nil
