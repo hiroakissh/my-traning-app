@@ -81,6 +81,7 @@ final class TrainingLog {
 
 @Model
 final class TrainingCondition {
+    var overallCondition: Int
     var sleepHours: Double?
     var sleepQuality: Int?
     var fatigueLevel: Int?
@@ -91,6 +92,7 @@ final class TrainingCondition {
     @Relationship(inverse: \TrainingLog.condition) var log: TrainingLog?
 
     init(
+        overallCondition: Int,
         sleepHours: Double? = nil,
         sleepQuality: Int? = nil,
         fatigueLevel: Int? = nil,
@@ -98,6 +100,7 @@ final class TrainingCondition {
         soreness: Int? = nil,
         conditionNote: String? = nil
     ) {
+        self.overallCondition = overallCondition
         self.sleepHours = sleepHours
         self.sleepQuality = sleepQuality
         self.fatigueLevel = fatigueLevel

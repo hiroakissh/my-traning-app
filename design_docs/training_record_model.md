@@ -12,7 +12,7 @@
 | endTime | Date (日時) | 任意 | 終了日時。分単位まで | `2024-03-01T08:45:00Z` |
 | sessionDurationSec | Int | 必須 | セッション全体の所要時間（秒）。タイマー計測 or 手入力で保存 | `4500` |
 | purpose | Enum | 必須 | セッション目的。`refresh`（リフレッシュ）/`hypertrophy`（筋肥大）/`diet`（ダイエット）/`tune`（調整） | `hypertrophy` |
-| condition | Object | 任意 | 当日の体調 | 下記参照 |
+| condition | Object | 任意 | 当日の体調。少なくとも`overallCondition`を保持 | 下記参照 |
 | exercises | Array\<Exercise\> | 必須（空配列可） | 実施した種目一覧 | 下記参照 |
 | note | String | 任意 | セッション全体のメモ | `睡眠短め。脚に張りあり` |
 
@@ -26,6 +26,7 @@
 | mood | Int | 任意 | 気分・やる気（1–5。高いほど良い） | `4` |
 | soreness | Int | 任意 | 筋肉痛レベル（1–5） | `2` |
 | conditionNote | String | 任意 | 体調に関する自由記述 | `腰に少し違和感` |
+| overallCondition | Int | 必須 | 体調の総合レーティング（1–5） | `4` |
 
 ### exercises（配列要素）
 
@@ -61,6 +62,7 @@
   "sessionDurationSec": 4500,
   "purpose": "hypertrophy",
   "condition": {
+    "overallCondition": 4,
     "sleepHours": 6.5,
     "sleepQuality": 3,
     "fatigueLevel": 2,
