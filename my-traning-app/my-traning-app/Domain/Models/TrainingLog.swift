@@ -149,6 +149,7 @@ final class TrainingExercise {
 
 @Model
 final class TrainingSet {
+    @Attribute(.unique) var id: UUID
     var order: Int
     var weightKg: Double?
     var reps: Int?
@@ -157,10 +158,12 @@ final class TrainingSet {
     var restSec: Int?
     var setNote: String?
     var isWarmup: Bool
+    var isBodyweight: Bool
 
     @Relationship(inverse: \TrainingExercise.sets) var exercise: TrainingExercise?
 
     init(
+        id: UUID = UUID(),
         order: Int,
         weightKg: Double? = nil,
         reps: Int? = nil,
@@ -168,8 +171,10 @@ final class TrainingSet {
         rpe: Double? = nil,
         restSec: Int? = nil,
         setNote: String? = nil,
-        isWarmup: Bool = false
+        isWarmup: Bool = false,
+        isBodyweight: Bool = false
     ) {
+        self.id = id
         self.order = order
         self.weightKg = weightKg
         self.reps = reps
@@ -178,5 +183,6 @@ final class TrainingSet {
         self.restSec = restSec
         self.setNote = setNote
         self.isWarmup = isWarmup
+        self.isBodyweight = isBodyweight
     }
 }
