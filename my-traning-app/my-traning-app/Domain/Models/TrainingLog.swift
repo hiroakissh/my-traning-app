@@ -30,14 +30,14 @@ enum BodyPart: String, Codable, CaseIterable {
 
     var displayName: String {
         switch self {
-        case .chest: "胸"
-        case .back: "背中"
-        case .legs: "脚"
-        case .shoulder: "肩"
-        case .arms: "腕"
-        case .core: "体幹"
-        case .fullBody: "全身"
-        case .other: "その他"
+        case .chest: return "胸"
+        case .back: return "背中"
+        case .legs: return "脚"
+        case .shoulder: return "肩"
+        case .arms: return "腕"
+        case .core: return "体幹"
+        case .fullBody: return "全身"
+        case .other: return "その他"
         }
     }
 }
