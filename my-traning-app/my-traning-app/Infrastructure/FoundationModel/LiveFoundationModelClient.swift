@@ -13,8 +13,12 @@ enum FoundationModelClientFactory {
 
 // 本番用のAPIクライアント
 @available(iOS 26.0, *)
-class LiveFoundationModelClient: FoundationModelClientProtocol {
-    private var session: LanguageModelSession?
+struct LiveFoundationModelClient: FoundationModelClientProtocol {
+    private final class SessionBox {
+        var session: LanguageModelSession?
+    }
+
+    private let box = SessionBox()
     private let systemModelProvider: () -> SystemLanguageModel
     private let instructions: Instructions
 
@@ -68,14 +72,14 @@ class LiveFoundationModelClient: FoundationModelClientProtocol {
             throw FoundationModelError.unavailable(availabilityStatus)
         }
 
-        if session == nil {
+        if box.session == nil {
             guard model.isAvailable else {
                 throw FoundationModelError.sessionUnavailable
             }
-            session = LanguageModelSession(instructions: instructions)
+            box.session = LanguageModelSession(instructions: instructions)
         }
 
-        guard let session else {
+        guard let session = box.session else {
             throw FoundationModelError.sessionUnavailable
         }
 

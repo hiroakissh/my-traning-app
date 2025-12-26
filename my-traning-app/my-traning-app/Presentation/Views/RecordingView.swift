@@ -1,10 +1,17 @@
 import SwiftUI
+import Combine
 
 struct RecordingView: View {
     private let workoutGroupsResult: Result<[WorkoutGroup], BundleDecodingError>
     private let healthDataProvider: HealthDataProviding
 
     @State private var selectedDate = Date()
+    @State private var selectedPurpose: TrainingPurpose = .hypertrophy
+    @State private var selectedSource: TrainingLogSource = .manual
+    @State private var sessionDurationText: String = ""
+    @State private var isConditionEnabled = false
+    @State private var overallConditionValue: Double = 3
+    @State private var noteText: String = ""
     @State private var selectedGroupIndex = 0
     @State private var selectedMenuItems = Set<WorkoutMenuItem>()
     @State private var strengthInputs: [StrengthExerciseInput] = []
@@ -14,8 +21,12 @@ struct RecordingView: View {
     @State private var isFetchingHealthData = false
     @State private var healthErrorMessage: String?
     @State private var lastSavedLog: TrainingLog?
+    @State private var restTimerSeconds: Int = 0
+    @State private var isRestTimerRunning: Bool = false
 
-    init(bundle: Bundle = .main, healthDataProvider: HealthDataProviding = MockHealthDataProvider()) {
+    private let restTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
+    init(bundle: Bundle = .main, healthDataProvider: HealthDataProviding = HealthDataProviderFactory.make()) {
         let dataResult: Result<WorkoutData, BundleDecodingError>
         do {
             let data: WorkoutData = try bundle.decode("workout_menus.json")
@@ -34,6 +45,14 @@ struct RecordingView: View {
             content
                 .navigationTitle("トレーニング記録")
         }
+        .onReceive(restTimer) { _ in
+            guard isRestTimerRunning else { return }
+            if restTimerSeconds > 0 {
+                restTimerSeconds -= 1
+            } else {
+                isRestTimerRunning = false
+            }
+        }
     }
 
     @ViewBuilder
@@ -48,6 +67,7 @@ struct RecordingView: View {
                     workoutSelectionSection(groups: groups)
                     strengthInputSection
                     cardioSection
+                    restTimerSection
                     healthSection
                     actionSection
                 }
@@ -59,8 +79,37 @@ struct RecordingView: View {
     }
 
     private var dateSection: some View {
-        Section("日付") {
+        Section("基本情報") {
             DatePicker("トレーニング日", selection: $selectedDate, displayedComponents: .date)
+
+            Picker("目的", selection: $selectedPurpose) {
+                ForEach(TrainingPurpose.allCases, id: \.self) { purpose in
+                    Text(displayName(for: purpose)).tag(purpose)
+                }
+            }
+
+            Picker("記録方法", selection: $selectedSource) {
+                ForEach(TrainingLogSource.allCases, id: \.self) { source in
+                    Text(displayName(for: source)).tag(source)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            TextField("セッション時間 (分)", text: $sessionDurationText)
+                .keyboardType(.numberPad)
+
+            Toggle("体調レーティングを入力する", isOn: $isConditionEnabled)
+            if isConditionEnabled {
+                VStack(alignment: .leading, spacing: 8) {
+                    Slider(value: $overallConditionValue, in: 1...5, step: 1)
+                    Text("今日の体調: \(Int(overallConditionValue)) / 5")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            TextField("メモ (任意)", text: $noteText, axis: .vertical)
+                .lineLimit(1...3)
         }
     }
 
@@ -141,6 +190,36 @@ struct RecordingView: View {
                     Text(String(format: "距離: %.1f km", metrics.distanceInKilometers))
                         .font(.caption)
                         .foregroundColor(.secondary)
+                }
+            }
+        }
+    }
+
+    private var restTimerSection: some View {
+        Section("タイマー") {
+            HStack {
+                Label("休憩タイマー", systemImage: "timer")
+                Spacer()
+                Text(formattedRestTime)
+                    .monospacedDigit()
+            }
+
+            HStack {
+                Button(isRestTimerRunning ? "一時停止" : "スタート") {
+                    toggleRestTimer()
+                }
+                .buttonStyle(.borderedProminent)
+
+                Button("リセット", action: resetRestTimer)
+                    .buttonStyle(.bordered)
+            }
+
+            HStack {
+                ForEach([60, 90, 120], id: \.self) { preset in
+                    Button("\(preset)秒") {
+                        startRestTimer(seconds: preset)
+                    }
+                    .buttonStyle(.bordered)
                 }
             }
         }
@@ -231,6 +310,31 @@ struct RecordingView: View {
         }
     }
 
+    private func startRestTimer(seconds: Int? = nil) {
+        if let seconds {
+            restTimerSeconds = seconds
+        }
+        isRestTimerRunning = true
+    }
+
+    private func toggleRestTimer() {
+        isRestTimerRunning.toggle()
+        if isRestTimerRunning && restTimerSeconds == 0 {
+            restTimerSeconds = 60
+        }
+    }
+
+    private func resetRestTimer() {
+        isRestTimerRunning = false
+        restTimerSeconds = 0
+    }
+
+    private var formattedRestTime: String {
+        let minutes = restTimerSeconds / 60
+        let seconds = restTimerSeconds % 60
+        return String(format: "%02d:%02d", minutes, seconds)
+    }
+
     private func startRecording() {
         let startDate = Date()
         sessionStartDate = startDate
@@ -256,35 +360,162 @@ struct RecordingView: View {
     }
 
     private func saveLog() {
+        let groups = (try? workoutGroupsResult.get()) ?? []
+
         let strengthLogs = strengthInputs.map { input in
-            StrengthExerciseLog(
+            let bodyPart = bodyPart(for: input.menuItem, groups: groups)
+            let setLogs = input.sets.map { set in
+                StrengthSetLog(
+                    weight: Double(set.weightText),
+                    repetitions: Int(set.repetitionsText)
+                )
+            }
+            return StrengthExerciseLog(
                 name: input.menuItem.name,
-                sets: input.sets.map { set in
-                    StrengthSetLog(
-                        weight: Double(set.weightText),
-                        repetitions: Int(set.repetitionsText)
+                bodyPart: bodyPart,
+                category: .strength,
+                sets: setLogs
+            )
+        }
+
+        var trainingExercises: [TrainingExercise] = strengthLogs.map { log in
+            TrainingExercise(
+                name: log.name,
+                bodyPart: log.bodyPart,
+                category: log.category,
+                sets: log.sets.enumerated().map { index, set in
+                    TrainingSet(
+                        order: index + 1,
+                        weightKg: set.weight,
+                        reps: set.repetitions,
+                        durationSec: set.durationSec,
+                        rpe: set.rpe,
+                        restSec: set.restSec,
+                        setNote: set.setNote,
+                        isWarmup: set.isWarmup,
+                        isBodyweight: set.isBodyweight
                     )
-                }
+                },
+                note: log.note
             )
         }
 
         var cardioLog: CardioExerciseLog?
         if let metrics = cardioInput.metrics {
             cardioLog = CardioExerciseLog(
+                name: "Cardio",
+                category: .cardio,
                 distanceInKilometers: metrics.distanceInKilometers,
                 durationInSeconds: metrics.durationInSeconds,
                 pace: metrics.pacePerKilometer
             )
+
+            let cardioSet = TrainingSet(
+                order: 1,
+                weightKg: nil,
+                reps: nil,
+                durationSec: Int(metrics.durationInSeconds),
+                rpe: nil,
+                restSec: nil,
+                setNote: nil,
+                isWarmup: false,
+                isBodyweight: true
+            )
+            trainingExercises.append(
+                TrainingExercise(
+                    name: "Cardio",
+                    bodyPart: .legs,
+                    category: .cardio,
+                    sets: [cardioSet],
+                    note: nil
+                )
+            )
         }
+
+        let condition = isConditionEnabled ? TrainingCondition(
+            sleepHours: nil,
+            sleepQuality: nil,
+            fatigueLevel: nil,
+            mood: nil,
+            soreness: nil,
+            conditionNote: nil,
+            overallCondition: Int(overallConditionValue)
+        ) : nil
+
+        let sessionDurationSec = computeSessionDuration()
+        let endDate = sessionStartDate.map { _ in Date() }
 
         let log = TrainingLog(
             date: selectedDate,
             startedAt: sessionStartDate,
+            endedAt: endDate,
+            sessionDurationSec: sessionDurationSec,
+            purpose: selectedPurpose,
+            source: selectedSource,
+            condition: condition,
+            exercises: trainingExercises,
             strengthExercises: strengthLogs,
             cardio: cardioLog,
-            healthSnapshot: healthSnapshot
+            healthSnapshot: healthSnapshot,
+            note: noteText.isEmpty ? nil : noteText
         )
         lastSavedLog = log
+    }
+
+    private func computeSessionDuration() -> Int? {
+        if let start = sessionStartDate {
+            return Int(Date().timeIntervalSince(start))
+        }
+        if let minutes = Int(sessionDurationText), minutes > 0 {
+            return minutes * 60
+        }
+        return nil
+    }
+
+    private func bodyPart(for menuItem: WorkoutMenuItem, groups: [WorkoutGroup]) -> BodyPart {
+        guard let group = groups.first(where: { $0.menus.contains(menuItem) }) else {
+            return .other
+        }
+        return mapBodyPart(from: group.muscleGroup)
+    }
+
+    private func mapBodyPart(from muscleGroup: String) -> BodyPart {
+        let lowercased = muscleGroup.lowercased()
+        let mappings: [(BodyPart, [String])] = [
+            (.chest, ["chest", "胸"]),
+            (.back, ["back", "背中"]),
+            (.legs, ["leg", "legs", "脚", "足", "下半身"]),
+            (.shoulder, ["shoulder", "肩"]),
+            (.arms, ["arm", "arms", "腕", "上腕"]),
+            (.core, ["core", "腹", "腹筋", "お腹", "体幹"]),
+            (.fullBody, ["full", "全身", "フルボディ"])
+        ]
+
+        for (bodyPart, keywords) in mappings {
+            if keywords.contains(where: { lowercased.contains($0.lowercased()) || muscleGroup.contains($0) }) {
+                return bodyPart
+            }
+        }
+        return .other
+    }
+
+    private func displayName(for purpose: TrainingPurpose) -> String {
+        switch purpose {
+        case .refresh: return "リフレッシュ"
+        case .hypertrophy: return "筋肥大"
+        case .diet: return "ダイエット"
+        case .tune: return "調整"
+        case .other: return "その他"
+        }
+    }
+
+    private func displayName(for source: TrainingLogSource) -> String {
+        switch source {
+        case .timer: return "タイマー"
+        case .manual: return "手入力"
+        case .imported: return "インポート"
+        case .unknown: return "不明"
+        }
     }
 }
 
