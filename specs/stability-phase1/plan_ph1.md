@@ -5,6 +5,26 @@
 - 画面実装は主にスタブデータ/UIレイヤーのみで、ドメイン/インフラとの接続は未完。
 - 既存仕組み: `AIWorkoutPlanner`（Foundation Modelクライアント）、`HealthDataProvider`（HealthKit抽象）、`TrainingLog`/`CardioMetrics`等のドメインモデル。
 
+## 進め方とブランチ（提案）
+1. `feature/hud-data-plumbing`  
+   - Plan/PlanSuggestion/PlanProgressモデル追加（Domain）。  
+   - RecordingSessionState（時間/距離/カロリー/心拍の進捗計算）。  
+   - TrainingLogグルーピング/統計ヘルパー（History/ホーム向け）。  
+2. `feature/hud-data-plumbing`（同ブランチで続行 or サブPR）  
+   - Homeのリング/カードをHealthKit & 最新ログに接続。  
+   - ローディング/エラー/空のUI分岐、AI欄リトライ。  
+3. `feature/recording-session-logic`  
+   - 目標タイプ別バリデーション＋CTA無効化。  
+   - ライブ計測とタイマー連動、TrainingLog保存まで接続。  
+4. `feature/history-filters`  
+   - sampleEvents除去→実ログ化、カレンダーイベント同期。  
+   - 検索/カテゴリフィルタとリスト遷移。  
+5. `feature/plan-active-state`  
+   - AI応答→PlanSuggestionマッピング、採用プラン永続化。  
+   - Activeプラン表示/再提案/他プラン表示/変更フロー。  
+6. `feature/a11y-i18n`  
+   - VoiceOver/Dynamic Type、文言のローカライズ化、プレビュー整理。
+
 ## 画面別の実装ギャップとタスク
 
 ### HomeView（HUDダッシュボード）
