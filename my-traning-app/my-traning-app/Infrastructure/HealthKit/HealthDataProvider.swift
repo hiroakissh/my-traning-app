@@ -50,7 +50,7 @@ final class LiveHealthDataProvider: HealthDataProviding {
             throw HealthDataProviderError.healthDataNotAvailable
         }
 
-        let readTypes: Set<HKObjectType> = [
+        let readTypes = Set([
             HKQuantityType.quantityType(forIdentifier: .heartRate),
             HKQuantityType.quantityType(forIdentifier: .restingHeartRate),
             HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned),
@@ -58,10 +58,9 @@ final class LiveHealthDataProvider: HealthDataProviding {
             HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning),
             HKQuantityType.quantityType(forIdentifier: .stepCount),
             HKQuantityType.quantityType(forIdentifier: .vo2Max)
-        ]
-            .compactMap { $0 }
+        ].compactMap { $0 })
 
-        let success = try await withCheckedThrowingContinuation { continuation in
+        let success: Bool = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Bool, Error>) in
             healthStore.requestAuthorization(toShare: [], read: readTypes) { isAuthorized, error in
                 if let error {
                     continuation.resume(throwing: error)
