@@ -42,8 +42,11 @@ struct RecordingView: View {
 
     var body: some View {
         NavigationStack {
-            content
-                .navigationTitle("トレーニング記録")
+            ZStack {
+                AppColors.background.ignoresSafeArea()
+                content
+            }
+            .navigationTitle("トレーニング記録")
         }
         .onReceive(restTimer) { _ in
             guard isRestTimerRunning else { return }
@@ -61,15 +64,22 @@ struct RecordingView: View {
         case .success(let groups):
             if groups.isEmpty {
                 EmptyStateView(title: "トレーニングメニューが登録されていません。", message: "管理画面からメニューを追加してください。")
+                    .padding()
             } else {
-                Form {
-                    dateSection
-                    workoutSelectionSection(groups: groups)
-                    strengthInputSection
-                    cardioSection
-                    restTimerSection
-                    healthSection
-                    actionSection
+                ScrollView {
+                    VStack(spacing: AppLayout.grid * 2) {
+                        basicInfoSection
+                        workoutSelectionSection(groups: groups)
+                        if !strengthInputs.isEmpty {
+                            strengthInputSection
+                        }
+                        cardioSection
+                        restTimerSection
+                        healthSection
+                        actionSection
+                    }
+                    .padding(.horizontal, AppLayout.grid * 2.5)
+                    .padding(.vertical, AppLayout.grid * 3)
                 }
             }
         case .failure(let error):
@@ -78,183 +88,269 @@ struct RecordingView: View {
         }
     }
 
-    private var dateSection: some View {
-        Section("基本情報") {
-            DatePicker("トレーニング日", selection: $selectedDate, displayedComponents: .date)
+    private var basicInfoSection: some View {
+        HudSectionCard(title: "基本情報", subtitle: "日付と目的を決めてシンプルに記録") {
+            VStack(alignment: .leading, spacing: AppLayout.grid * 1.5) {
+                hudLabeledField("トレーニング日") {
+                    DatePicker("", selection: $selectedDate, displayedComponents: .date)
+                        .labelsHidden()
+                        .tint(AppColors.primary)
+                }
 
-            Picker("目的", selection: $selectedPurpose) {
-                ForEach(TrainingPurpose.allCases, id: \.self) { purpose in
-                    Text(displayName(for: purpose)).tag(purpose)
+                hudLabeledField("目的") {
+                    Picker("目的", selection: $selectedPurpose) {
+                        ForEach(TrainingPurpose.allCases, id: \.self) { purpose in
+                            Text(displayName(for: purpose))
+                                .tag(purpose)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .tint(AppColors.primary)
+                }
+
+                VStack(alignment: .leading, spacing: AppLayout.grid * 0.75) {
+                    fieldLabel("記録方法")
+                    Picker("記録方法", selection: $selectedSource) {
+                        ForEach(TrainingLogSource.allCases, id: \.self) { source in
+                            Text(displayName(for: source)).tag(source)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .tint(AppColors.primary)
+                }
+
+                hudLabeledField("セッション時間 (分)") {
+                    TextField("セッション時間 (分)", text: $sessionDurationText)
+                        .keyboardType(.numberPad)
+                }
+
+                Toggle("体調レーティングを入力する", isOn: $isConditionEnabled)
+                    .tint(AppColors.primary)
+                    .font(AppTypography.body())
+                    .foregroundColor(AppColors.textPrimary)
+
+                if isConditionEnabled {
+                    VStack(alignment: .leading, spacing: AppLayout.grid) {
+                        Slider(value: $overallConditionValue, in: 1...5, step: 1)
+                            .tint(AppColors.primary)
+                        Text("今日の体調: \(Int(overallConditionValue)) / 5")
+                            .font(AppTypography.label(12))
+                            .foregroundColor(AppColors.textSecondary)
+                    }
+                    .padding(.top, AppLayout.grid * 0.5)
+                }
+
+                hudLabeledField("メモ (任意)") {
+                    TextField("メモ", text: $noteText, axis: .vertical)
+                        .lineLimit(1...3)
                 }
             }
-
-            Picker("記録方法", selection: $selectedSource) {
-                ForEach(TrainingLogSource.allCases, id: \.self) { source in
-                    Text(displayName(for: source)).tag(source)
-                }
-            }
-            .pickerStyle(.segmented)
-
-            TextField("セッション時間 (分)", text: $sessionDurationText)
-                .keyboardType(.numberPad)
-
-            Toggle("体調レーティングを入力する", isOn: $isConditionEnabled)
-            if isConditionEnabled {
-                VStack(alignment: .leading, spacing: 8) {
-                    Slider(value: $overallConditionValue, in: 1...5, step: 1)
-                    Text("今日の体調: \(Int(overallConditionValue)) / 5")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-
-            TextField("メモ (任意)", text: $noteText, axis: .vertical)
-                .lineLimit(1...3)
         }
     }
 
     private func workoutSelectionSection(groups: [WorkoutGroup]) -> some View {
-        Section("種目選択") {
+        HudSectionCard(title: "種目選択", subtitle: "部位を選んでメニューをピック") {
             let safeIndex = min(selectedGroupIndex, max(groups.count - 1, 0))
-            Picker("部位", selection: $selectedGroupIndex) {
-                ForEach(0..<groups.count, id: \.self) { index in
-                    Text(groups[index].muscleGroup).tag(index)
-                }
-            }
-            .pickerStyle(.segmented)
 
-            ForEach(groups[safeIndex].menus, id: \.id) { item in
-                Button(action: {
-                    toggleSelection(for: item)
-                }) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(item.name)
-                                .font(.headline)
-                            Text(item.description)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        Spacer()
-                        if selectedMenuItems.contains(item) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.accentColor)
+            VStack(alignment: .leading, spacing: AppLayout.grid * 1.25) {
+                VStack(alignment: .leading, spacing: AppLayout.grid * 0.75) {
+                    fieldLabel("部位")
+                    Picker("部位", selection: $selectedGroupIndex) {
+                        ForEach(0..<groups.count, id: \.self) { index in
+                            Text(groups[index].muscleGroup).tag(index)
                         }
                     }
+                    .pickerStyle(.segmented)
+                    .tint(AppColors.primary)
                 }
-                .buttonStyle(.plain)
+
+                LazyVStack(spacing: AppLayout.grid) {
+                    ForEach(groups[safeIndex].menus, id: \.id) { item in
+                        Button(action: {
+                            toggleSelection(for: item)
+                        }) {
+                            HStack(alignment: .top, spacing: AppLayout.grid) {
+                                VStack(alignment: .leading, spacing: AppLayout.grid * 0.5) {
+                                    Text(item.name)
+                                        .font(AppTypography.body(16, weight: .semibold))
+                                        .foregroundColor(AppColors.textPrimary)
+                                    Text(item.description)
+                                        .font(AppTypography.label(12))
+                                        .foregroundColor(AppColors.textSecondary)
+                                }
+                                Spacer()
+                                if selectedMenuItems.contains(item) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(AppColors.primary)
+                                }
+                            }
+                            .padding(.horizontal, AppLayout.grid * 1.5)
+                            .padding(.vertical, AppLayout.grid * 1.25)
+                            .background(AppColors.surface2.opacity(0.92))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: AppLayout.buttonRadius, style: .continuous)
+                                    .stroke(selectedMenuItems.contains(item) ? AppColors.primary : AppColors.divider, lineWidth: 1)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: AppLayout.buttonRadius, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
             }
         }
     }
 
     private var strengthInputSection: some View {
-        Group {
-            if !strengthInputs.isEmpty {
-                Section("筋トレ入力") {
-                    ForEach($strengthInputs) { $input in
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(input.menuItem.name)
-                                .font(.headline)
-                            ForEach($input.sets) { $set in
-                                HStack {
-                                    TextField("重量 (kg)", text: $set.weightText)
-                                        .keyboardType(.decimalPad)
-                                    TextField("回数", text: $set.repetitionsText)
-                                        .keyboardType(.numberPad)
-                                }
+        HudSectionCard(title: "筋トレ入力", subtitle: "セットを追加して重さと回数を記録") {
+            VStack(alignment: .leading, spacing: AppLayout.grid * 1.5) {
+                ForEach($strengthInputs) { $input in
+                    VStack(alignment: .leading, spacing: AppLayout.grid) {
+                        Text(input.menuItem.name)
+                            .font(AppTypography.body(16, weight: .semibold))
+                            .foregroundColor(AppColors.textPrimary)
+
+                        ForEach($input.sets) { $set in
+                            HStack(spacing: AppLayout.grid) {
+                                TextField("重量 (kg)", text: $set.weightText)
+                                    .keyboardType(.decimalPad)
+                                    .hudFieldStyle()
+                                TextField("回数", text: $set.repetitionsText)
+                                    .keyboardType(.numberPad)
+                                    .hudFieldStyle()
                             }
-                            Button(action: {
-                                input.sets.append(StrengthSetInput())
-                            }) {
-                                Label("セットを追加", systemImage: "plus.circle")
-                            }
-                            .buttonStyle(.borderless)
                         }
-                        .padding(.vertical, 6)
+                        Button(action: {
+                            input.sets.append(StrengthSetInput())
+                        }) {
+                            Label("セットを追加", systemImage: "plus.circle")
+                                .font(AppTypography.body(15, weight: .semibold))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .buttonStyle(.bordered)
+                        .buttonBorderShape(.roundedRectangle(radius: AppLayout.buttonRadius))
+                        .tint(AppColors.primary)
                     }
+                    .padding(.vertical, AppLayout.grid * 0.5)
                 }
             }
         }
     }
 
     private var cardioSection: some View {
-        Section("ランニング/有酸素") {
-            TextField("距離 (km)", text: $cardioInput.distanceText)
-                .keyboardType(.decimalPad)
-            TextField("時間 (分:秒)", text: $cardioInput.durationText)
-                .keyboardType(.numbersAndPunctuation)
+        HudSectionCard(title: "ランニング/有酸素", subtitle: "距離と時間を淡々と入力") {
+            VStack(alignment: .leading, spacing: AppLayout.grid * 1.25) {
+                hudLabeledField("距離 (km)") {
+                    TextField("距離 (km)", text: $cardioInput.distanceText)
+                        .keyboardType(.decimalPad)
+                }
 
-            if let metrics = cardioInput.metrics {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("ペース: \(metrics.formattedPace)")
-                    Text(String(format: "距離: %.1f km", metrics.distanceInKilometers))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                hudLabeledField("時間 (分:秒)") {
+                    TextField("時間 (分:秒)", text: $cardioInput.durationText)
+                        .keyboardType(.numbersAndPunctuation)
+                }
+
+                if let metrics = cardioInput.metrics {
+                    VStack(alignment: .leading, spacing: AppLayout.grid * 0.75) {
+                        Text("ペース: \(metrics.formattedPace)")
+                            .font(AppTypography.body())
+                            .foregroundColor(AppColors.textPrimary)
+                        Text(String(format: "距離: %.1f km", metrics.distanceInKilometers))
+                            .font(AppTypography.label(12))
+                            .foregroundColor(AppColors.textSecondary)
+                    }
+                    .padding(.top, AppLayout.grid * 0.5)
                 }
             }
         }
     }
 
     private var restTimerSection: some View {
-        Section("タイマー") {
-            HStack {
-                Label("休憩タイマー", systemImage: "timer")
-                Spacer()
-                Text(formattedRestTime)
-                    .monospacedDigit()
-            }
-
-            HStack {
-                Button(isRestTimerRunning ? "一時停止" : "スタート") {
-                    toggleRestTimer()
+        HudSectionCard(title: "タイマー", subtitle: "休憩もHUDらしく管理") {
+            VStack(alignment: .leading, spacing: AppLayout.grid * 1.25) {
+                HStack {
+                    Label("休憩タイマー", systemImage: "timer")
+                        .foregroundColor(AppColors.textPrimary)
+                    Spacer()
+                    Text(formattedRestTime)
+                        .font(AppTypography.hudNumber(38))
+                        .foregroundColor(AppColors.primary)
                 }
-                .buttonStyle(.borderedProminent)
 
-                Button("リセット", action: resetRestTimer)
-                    .buttonStyle(.bordered)
-            }
-
-            HStack {
-                ForEach([60, 90, 120], id: \.self) { preset in
-                    Button("\(preset)秒") {
-                        startRestTimer(seconds: preset)
+                HStack(spacing: AppLayout.grid) {
+                    Button(isRestTimerRunning ? "一時停止" : "スタート") {
+                        toggleRestTimer()
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.borderedProminent)
+                    .buttonBorderShape(.roundedRectangle(radius: AppLayout.buttonRadius))
+                    .tint(AppColors.primary)
+
+                    Button("リセット", action: resetRestTimer)
+                        .buttonStyle(.bordered)
+                        .buttonBorderShape(.roundedRectangle(radius: AppLayout.buttonRadius))
+                        .tint(AppColors.textSecondary)
+                }
+
+                HStack(spacing: AppLayout.grid) {
+                    ForEach([60, 90, 120], id: \.self) { preset in
+                        Button("\(preset)秒") {
+                            startRestTimer(seconds: preset)
+                        }
+                        .buttonStyle(.bordered)
+                        .buttonBorderShape(.roundedRectangle(radius: AppLayout.buttonRadius))
+                        .tint(AppColors.secondary)
+                    }
                 }
             }
         }
     }
 
     private var healthSection: some View {
-        Section("ヘルスケアデータ") {
-            if let start = sessionStartDate {
-                HStack {
-                    Label("セッション開始", systemImage: "clock")
-                    Spacer()
-                    Text(start, style: .time)
+        HudSectionCard(title: "ヘルスケアデータ", subtitle: "開始から取得したスナップショット") {
+            VStack(alignment: .leading, spacing: AppLayout.grid * 1.25) {
+                if let start = sessionStartDate {
+                    HStack {
+                        Label("セッション開始", systemImage: "clock")
+                        Spacer()
+                        Text(start, style: .time)
+                            .font(AppTypography.body())
+                    }
+                    .foregroundColor(AppColors.textPrimary)
+                } else {
+                    Text("記録開始後にHealthKitのデータを取得します。")
+                        .foregroundColor(AppColors.textSecondary)
+                        .font(AppTypography.body())
                 }
-            } else {
-                Text("記録開始後にHealthKitのデータを取得します。")
-                    .foregroundColor(.secondary)
-            }
 
-            if isFetchingHealthData {
-                ProgressView("ヘルスデータ取得中…")
-            }
+                if isFetchingHealthData {
+                    ProgressView("ヘルスデータ取得中…")
+                        .tint(AppColors.primary)
+                        .foregroundColor(AppColors.textSecondary)
+                }
 
-            if let healthErrorMessage {
-                Text(healthErrorMessage)
-                    .foregroundColor(.red)
-            }
+                if let healthErrorMessage {
+                    HStack(alignment: .top, spacing: AppLayout.grid) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .foregroundColor(AppColors.secondary)
+                        Text(healthErrorMessage)
+                            .font(AppTypography.label(12))
+                            .foregroundColor(AppColors.textPrimary)
+                    }
+                }
 
-            if let snapshot = healthSnapshot {
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(snapshot.availableMetrics.sorted(by: { $0.key < $1.key }), id: \.key) { item in
-                        HStack {
-                            Text(item.key)
-                            Spacer()
-                            Text(item.value)
-                                .foregroundColor(.secondary)
+                if let snapshot = healthSnapshot {
+                    VStack(alignment: .leading, spacing: AppLayout.grid * 0.75) {
+                        ForEach(snapshot.availableMetrics.sorted(by: { $0.key < $1.key }), id: \.key) { item in
+                            HStack {
+                                Text(item.key)
+                                    .foregroundColor(AppColors.textPrimary)
+                                Spacer()
+                                Text(item.value)
+                                    .foregroundColor(AppColors.textSecondary)
+                                    .font(AppTypography.label(12))
+                            }
+                            if item.key != snapshot.availableMetrics.keys.sorted().last {
+                                Divider().overlay(AppColors.divider)
+                            }
                         }
                     }
                 }
@@ -263,35 +359,60 @@ struct RecordingView: View {
     }
 
     private var actionSection: some View {
-        Section {
-            Button(action: startRecording) {
-                Label("記録を開始", systemImage: "play.fill")
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(selectedMenuItems.isEmpty)
+        HudSectionCard(useSecondarySurface: true) {
+            VStack(alignment: .leading, spacing: AppLayout.grid * 1.25) {
+                Button(action: startRecording) {
+                    Label("記録を開始", systemImage: "play.fill")
+                        .font(AppTypography.body(16, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .buttonBorderShape(.roundedRectangle(radius: AppLayout.buttonRadius))
+                .tint(AppColors.primary)
+                .disabled(selectedMenuItems.isEmpty)
 
-            Button(action: saveLog) {
-                Label("保存", systemImage: "checkmark.circle")
-            }
-            .buttonStyle(.bordered)
+                Button(action: saveLog) {
+                    Label("保存", systemImage: "checkmark.circle")
+                        .font(AppTypography.body(16, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.roundedRectangle(radius: AppLayout.buttonRadius))
+                .tint(AppColors.primary)
 
-            if let lastSavedLog {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("保存済み: \(lastSavedLog.strengthExercises.count)種目")
-                        .font(.subheadline)
-                    if let cardio = lastSavedLog.cardio {
-                        Text(String(format: "有酸素: %.1f km", cardio.distanceInKilometers))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    if let snapshot = lastSavedLog.healthSnapshot {
-                        Text("ヘルスデータ: \(snapshot.availableMetrics.count)項目")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                if let lastSavedLog {
+                    VStack(alignment: .leading, spacing: AppLayout.grid * 0.75) {
+                        Text("保存済み: \(lastSavedLog.strengthExercises.count)種目")
+                            .font(AppTypography.body(15))
+                            .foregroundColor(AppColors.textPrimary)
+                        if let cardio = lastSavedLog.cardio {
+                            Text(String(format: "有酸素: %.1f km", cardio.distanceInKilometers))
+                                .font(AppTypography.label(12))
+                                .foregroundColor(AppColors.textSecondary)
+                        }
+                        if let snapshot = lastSavedLog.healthSnapshot {
+                            Text("ヘルスデータ: \(snapshot.availableMetrics.count)項目")
+                                .font(AppTypography.label(12))
+                                .foregroundColor(AppColors.textSecondary)
+                        }
                     }
                 }
             }
         }
+    }
+
+    private func hudLabeledField<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: AppLayout.grid * 0.75) {
+            fieldLabel(title)
+            content()
+                .hudFieldStyle()
+        }
+    }
+
+    private func fieldLabel(_ title: String) -> some View {
+        Text(title)
+            .font(AppTypography.label())
+            .foregroundColor(AppColors.textSecondary)
     }
 
     private func toggleSelection(for item: WorkoutMenuItem) {
@@ -524,15 +645,17 @@ private struct EmptyStateView: View {
     let message: String
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: AppLayout.grid * 1.5) {
             Text(title)
-                .font(.headline)
+                .font(AppTypography.body(17, weight: .semibold))
+                .foregroundColor(AppColors.textPrimary)
             Text(message)
-                .font(.subheadline)
+                .font(AppTypography.body(15))
                 .multilineTextAlignment(.center)
-                .foregroundColor(.secondary)
+                .foregroundColor(AppColors.textSecondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .hudBackground()
     }
 }
 

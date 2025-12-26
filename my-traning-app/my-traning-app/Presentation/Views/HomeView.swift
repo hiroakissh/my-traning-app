@@ -9,104 +9,104 @@ struct HomeView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    // 1. 今日のトレーニングプラン
-                    Section(header: Text("今日のトレーニングプラン").font(.title2).bold()) {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("胸の日 - 中級")
-                                .font(.headline)
-                            HStack {
-                                Image(systemName: "flame.fill")
-                                    .foregroundColor(.orange)
-                                Text("ベンチプレス: 3セット x 10回 (60kg)")
+            ZStack {
+                AppColors.background.ignoresSafeArea()
+                ScrollView {
+                    VStack(alignment: .leading, spacing: AppLayout.grid * 2) {
+                        HudSectionCard(title: "今日のトレーニングプラン", subtitle: "今夜のセッションで集中したい部位") {
+                            VStack(alignment: .leading, spacing: AppLayout.grid * 1.25) {
+                                Text("胸の日 - 中級")
+                                    .font(AppTypography.title(20))
+                                    .foregroundColor(AppColors.textPrimary)
+                                planRow(icon: "flame.fill", text: "ベンチプレス: 3セット x 10回 (60kg)")
+                                planRow(icon: "flame.fill", text: "ダンベルフライ: 3セット x 12回 (12kg)")
                             }
-                            HStack {
-                                Image(systemName: "flame.fill")
-                                    .foregroundColor(.orange)
-                                Text("ダンベルフライ: 3セット x 12回 (12kg)")
-                            }
-                        }
-                        .padding()
-                        .background(Color(.secondarySystemGroupedBackground))
-                        .cornerRadius(12)
-                    }
-
-                    // 2. プラン進捗ウィジェット
-                    Section(header: Text("プラン進捗").font(.title2).bold()) {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("目標: ベンチプレス 100kg")
-                            ProgressView(value: 0.6) {
-                                Text("現在: 60kg (60%)")
-                            }
-                            Text("トレーニング継続: 25日目")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        .padding()
-                        .background(Color(.secondarySystemGroupedBackground))
-                        .cornerRadius(12)
-                    }
-
-                    // 3. AIアシスタント
-                    Section(header: Text("AIアシスタント").font(.title2).bold()) {
-                        // エラーメッセージの表示
-                        if let errorMessage = planner.errorMessage {
-                            HStack(alignment: .top, spacing: 8) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .foregroundColor(.orange)
-                                Text(errorMessage)
-                                    .font(.caption)
-                                    .foregroundColor(.primary)
-                                    .multilineTextAlignment(.leading)
-                            }
-                            .padding(8)
-                            .background(Color(.systemOrange).opacity(0.15))
-                            .cornerRadius(8)
                         }
 
-                        // AIからの返信を表示するエリア
-                        if !planner.todaySuggestion.isEmpty {
-                            HStack {
-                                Image(systemName: "sparkle")
-                                    .foregroundColor(.accentColor)
-                                Text(planner.todaySuggestion)
-                            }
-                            .padding()
-                            .background(Color.accentColor.opacity(0.1))
-                            .cornerRadius(12)
-                        }
-                        
-                        TextField("今日は忙しいけど何ができる？", text: $aiQuery)
-                            .textFieldStyle(.roundedBorder)
-                            .disabled(planner.isLoading)
-                        
-                        Button(action: { triggerSuggestion = true }) {
-                            if planner.isLoading {
-                                ProgressView()
-                                    .frame(maxWidth: .infinity)
-                            } else {
-                                Text("質問する")
-                                    .frame(maxWidth: .infinity)
+                        HudSectionCard(title: "プラン進捗", subtitle: "静かなHUDで淡々とチェック") {
+                            VStack(alignment: .leading, spacing: AppLayout.grid * 1.25) {
+                                Text("目標: ベンチプレス 100kg")
+                                    .font(AppTypography.body(16, weight: .semibold))
+                                    .foregroundColor(AppColors.textPrimary)
+                                ProgressView(value: 0.6) {
+                                    Text("現在: 60kg (60%)")
+                                        .font(AppTypography.label(13))
+                                        .foregroundColor(AppColors.textSecondary)
+                                }
+                                .tint(AppColors.primary)
+                                Text("トレーニング継続: 25日目")
+                                    .font(AppTypography.label(12))
+                                    .foregroundColor(AppColors.textSecondary)
                             }
                         }
-                        .buttonStyle(.bordered)
-                        .tint(.accentColor)
-                        .disabled(planner.isLoading || aiQuery.isEmpty)
+
+                        HudSectionCard(title: "AIアシスタント", subtitle: "短く尋ねるほど冴えた提案に") {
+                            if let errorMessage = planner.errorMessage {
+                                HStack(alignment: .top, spacing: AppLayout.grid) {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .foregroundColor(AppColors.secondary)
+                                    Text(errorMessage)
+                                        .font(AppTypography.label(12))
+                                        .foregroundColor(AppColors.textPrimary)
+                                        .multilineTextAlignment(.leading)
+                                }
+                                .padding(AppLayout.grid * 1.25)
+                                .background(AppColors.secondary.opacity(0.12))
+                                .clipShape(RoundedRectangle(cornerRadius: AppLayout.buttonRadius, style: .continuous))
+                            }
+
+                            if !planner.todaySuggestion.isEmpty {
+                                HStack(alignment: .top, spacing: AppLayout.grid) {
+                                    Image(systemName: "sparkles")
+                                        .foregroundColor(AppColors.primary)
+                                    Text(planner.todaySuggestion)
+                                        .font(AppTypography.body(15))
+                                        .foregroundColor(AppColors.textPrimary)
+                                }
+                                .padding(AppLayout.grid * 1.25)
+                                .background(AppColors.primary.opacity(0.12))
+                                .clipShape(RoundedRectangle(cornerRadius: AppLayout.cardRadius, style: .continuous))
+                            }
+                            
+                            TextField("今日は忙しいけど何ができる？", text: $aiQuery)
+                                .hudFieldStyle()
+                                .disabled(planner.isLoading)
+                            
+                            Button(action: { triggerSuggestion = true }) {
+                                if planner.isLoading {
+                                    ProgressView()
+                                        .frame(maxWidth: .infinity)
+                                } else {
+                                    Text("質問する")
+                                        .font(AppTypography.body(16, weight: .semibold))
+                                        .frame(maxWidth: .infinity)
+                                }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .buttonBorderShape(.roundedRectangle(radius: AppLayout.buttonRadius))
+                            .tint(AppColors.primary)
+                            .disabled(planner.isLoading || aiQuery.isEmpty)
+                        }
                     }
+                    .padding(.horizontal, AppLayout.grid * 2.5)
+                    .padding(.vertical, AppLayout.grid * 3)
                 }
-                .padding()
             }
             .navigationTitle("ホーム")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {}) {
-                        HStack {
+                        HStack(spacing: AppLayout.grid) {
                             Image(systemName: "plus.circle.fill")
                             Text("記録する")
+                                .font(AppTypography.body(15, weight: .semibold))
                         }
+                        .padding(.horizontal, AppLayout.grid * 1.5)
+                        .padding(.vertical, AppLayout.grid)
+                        .background(AppColors.primary.opacity(0.14))
+                        .clipShape(RoundedRectangle(cornerRadius: AppLayout.buttonRadius, style: .continuous))
                     }
-                    .buttonStyle(.borderedProminent)
+                    .tint(AppColors.primary)
                 }
             }
             // triggerSuggestionがtrueになったら非同期タスクを実行
@@ -116,6 +116,16 @@ struct HomeView: View {
                     triggerSuggestion = false
                 }
             }
+        }
+    }
+
+    private func planRow(icon: String, text: String) -> some View {
+        HStack(spacing: AppLayout.grid) {
+            Image(systemName: icon)
+                .foregroundColor(AppColors.primary)
+            Text(text)
+                .font(AppTypography.body())
+                .foregroundColor(AppColors.textPrimary)
         }
     }
 }

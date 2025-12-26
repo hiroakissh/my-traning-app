@@ -23,6 +23,8 @@ struct MainView: View {
                     Label("プラン", systemImage: "list.bullet.clipboard.fill")
                 }
         }
+        .hudBackground()
+        .tint(AppColors.primary)
     }
 }
 

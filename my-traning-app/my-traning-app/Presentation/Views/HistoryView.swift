@@ -21,28 +21,34 @@ struct HistoryView: View {
 
     var body: some View {
         NavigationStack {
-            VStack {
-                Picker("表示モード", selection: $selectedMode) {
-                    Text("リスト").tag(0)
-                    Text("カレンダー").tag(1)
-                    Text("分析").tag(2)
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal)
+            ZStack {
+                AppColors.background.ignoresSafeArea()
+                ScrollView {
+                    VStack(spacing: AppLayout.grid * 2) {
+                        HudSectionCard(title: "表示モード", subtitle: "リスト/カレンダー/分析を切り替え") {
+                            Picker("表示モード", selection: $selectedMode) {
+                                Text("リスト").tag(0)
+                                Text("カレンダー").tag(1)
+                                Text("分析").tag(2)
+                            }
+                            .pickerStyle(.segmented)
+                            .tint(AppColors.primary)
+                        }
 
-                // 表示モードに応じてViewを切り替え
-                switch selectedMode {
-                case 0:
-                    ListView()
-                case 1:
-                    CalendarView(selectedDate: $selectedDate)
-                case 2:
-                    ChartView()
-                default:
-                    Text("Error")
+                        switch selectedMode {
+                        case 0:
+                            ListView()
+                        case 1:
+                            CalendarView(selectedDate: $selectedDate)
+                        case 2:
+                            ChartView()
+                        default:
+                            EmptyView()
+                        }
+                    }
+                    .padding(.horizontal, AppLayout.grid * 2.5)
+                    .padding(.vertical, AppLayout.grid * 3)
                 }
-                
-                Spacer()
             }
             .navigationTitle("履歴")
         }
@@ -53,11 +59,25 @@ struct HistoryView: View {
 
 private struct ListView: View {
     var body: some View {
-        List(dummyHistory) { item in
-            VStack(alignment: .leading) {
-                Text(item.date).font(.caption).foregroundColor(.secondary)
-                Text(item.title).font(.headline)
-                Text(item.summary).font(.subheadline)
+        HudSectionCard(title: "ログ一覧") {
+            VStack(alignment: .leading, spacing: AppLayout.grid * 1.5) {
+                ForEach(Array(dummyHistory.enumerated()), id: \.element.id) { index, item in
+                    VStack(alignment: .leading, spacing: AppLayout.grid * 0.75) {
+                        Text(item.date)
+                            .font(AppTypography.label(12))
+                            .foregroundColor(AppColors.textSecondary)
+                        Text(item.title)
+                            .font(AppTypography.body(17, weight: .semibold))
+                            .foregroundColor(AppColors.textPrimary)
+                        Text(item.summary)
+                            .font(AppTypography.body(15))
+                            .foregroundColor(AppColors.textSecondary)
+                    }
+                    if index < dummyHistory.count - 1 {
+                        Divider()
+                            .overlay(AppColors.divider)
+                    }
+                }
             }
         }
     }
@@ -67,10 +87,11 @@ private struct CalendarView: View {
     @Binding var selectedDate: Date
     
     var body: some View {
-        // iOS 16.0+ で利用可能な GraphicalDatePickerStyle
-        DatePicker("日付を選択", selection: $selectedDate, displayedComponents: .date)
-            .datePickerStyle(.graphical)
-            .padding()
+        HudSectionCard(title: "カレンダー", subtitle: "日付をタップして記録を表示") {
+            DatePicker("日付を選択", selection: $selectedDate, displayedComponents: .date)
+                .datePickerStyle(.graphical)
+                .tint(AppColors.primary)
+        }
     }
 }
 
@@ -81,20 +102,20 @@ private struct ChartView: View {
     ]
     
     var body: some View {
-        VStack(alignment: .leading) {
-            Text("ベンチプレス 重量推移 (kg)")
-                .font(.headline)
-                .padding()
-            
+        HudSectionCard(title: "ベンチプレス 重量推移 (kg)", subtitle: "淡いグローで推移を俯瞰") {
             Chart {
                 ForEach(chartData, id: \.0) { month, weight in
                     BarMark(
                         x: .value("月", month),
                         y: .value("重量(kg)", weight)
                     )
+                    .foregroundStyle(AppColors.primary)
                 }
             }
-            .padding()
+            .chartYAxis {
+                AxisMarks(position: .leading)
+            }
+            .frame(minHeight: 180)
         }
     }
 }

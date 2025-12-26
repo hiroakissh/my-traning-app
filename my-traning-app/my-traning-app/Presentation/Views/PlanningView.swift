@@ -9,37 +9,45 @@ struct PlanningView: View {
 
     var body: some View {
         NavigationStack {
-            VStack {
-                if planner.isLoading {
-                    // ローディング中の表示
-                    ProgressView("新しいプランを生成しています...")
-                        .padding()
-                } else if let errorMessage = planner.errorMessage {
-                    // エラーメッセージの表示
-                    VStack(spacing: 12) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.largeTitle)
-                            .foregroundColor(.orange)
-                        Text(errorMessage)
-                            .multilineTextAlignment(.center)
-                            .foregroundColor(.primary)
+            ZStack {
+                AppColors.background.ignoresSafeArea()
+                VStack(spacing: AppLayout.grid * 2) {
+                    HudSectionCard(title: "AIプランナー", subtitle: "静かに練ったプランを受け取る") {
+                        if planner.isLoading {
+                            ProgressView("新しいプランを生成しています...")
+                                .tint(AppColors.primary)
+                                .foregroundColor(AppColors.textSecondary)
+                        } else if let errorMessage = planner.errorMessage {
+                            VStack(spacing: AppLayout.grid * 1.25) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.largeTitle)
+                                    .foregroundColor(AppColors.secondary)
+                                Text(errorMessage)
+                                    .multilineTextAlignment(.center)
+                                    .font(AppTypography.body(15))
+                                    .foregroundColor(AppColors.textPrimary)
+                            }
+                        } else if !planner.generatedPlan.isEmpty {
+                            ScrollView {
+                                Text(planner.generatedPlan)
+                                    .font(AppTypography.body())
+                                    .foregroundColor(AppColors.textPrimary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.vertical, AppLayout.grid)
+                            }
+                            .frame(maxHeight: 320)
+                        } else {
+                            Text("「再生成」ボタンを押して、新しいプランを作成してください。")
+                                .foregroundColor(AppColors.textSecondary)
+                                .multilineTextAlignment(.center)
+                                .font(AppTypography.body())
+                        }
                     }
-                    .padding()
-                } else if !planner.generatedPlan.isEmpty {
-                    // 生成されたプランの表示
-                    ScrollView {
-                        Text(planner.generatedPlan)
-                            .padding()
-                    }
-                } else {
-                    // 初期表示またはプランがない場合の表示
-                    Text("「再生成」ボタンを押して、新しいプランを作成してください。")
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding()
+                    
+                    Spacer()
                 }
-                
-                Spacer()
+                .padding(.horizontal, AppLayout.grid * 2.5)
+                .padding(.vertical, AppLayout.grid * 3)
             }
             .navigationTitle("プランニング")
             .toolbar {
@@ -48,12 +56,17 @@ struct PlanningView: View {
                         // ボタンタップでプラン生成をトリガー
                         triggerPlanGeneration = true
                     }) {
-                        HStack {
+                        HStack(spacing: AppLayout.grid) {
                             Image(systemName: "arrow.clockwise.circle.fill")
                             Text("再生成")
+                                .font(AppTypography.body(15, weight: .semibold))
                         }
+                        .padding(.horizontal, AppLayout.grid * 1.5)
+                        .padding(.vertical, AppLayout.grid)
+                        .background(AppColors.primary.opacity(0.14))
+                        .clipShape(RoundedRectangle(cornerRadius: AppLayout.buttonRadius, style: .continuous))
                     }
-                    .buttonStyle(.bordered)
+                    .tint(AppColors.primary)
                     .disabled(planner.isLoading) // ローディング中はボタンを無効化
                 }
             }
