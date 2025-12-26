@@ -481,13 +481,21 @@ struct RecordingView: View {
 
     private func mapBodyPart(from muscleGroup: String) -> BodyPart {
         let lowercased = muscleGroup.lowercased()
-        if lowercased.contains("chest") { return .chest }
-        if lowercased.contains("back") { return .back }
-        if lowercased.contains("leg") { return .legs }
-        if lowercased.contains("shoulder") { return .shoulder }
-        if lowercased.contains("arm") { return .arms }
-        if lowercased.contains("core") { return .core }
-        if lowercased.contains("full") { return .fullBody }
+        let mappings: [(BodyPart, [String])] = [
+            (.chest, ["chest", "胸"]),
+            (.back, ["back", "背中"]),
+            (.legs, ["leg", "legs", "脚", "足", "下半身"]),
+            (.shoulder, ["shoulder", "肩"]),
+            (.arms, ["arm", "arms", "腕", "上腕"]),
+            (.core, ["core", "腹", "腹筋", "お腹", "体幹"]),
+            (.fullBody, ["full", "全身", "フルボディ"])
+        ]
+
+        for (bodyPart, keywords) in mappings {
+            if keywords.contains(where: { lowercased.contains($0.lowercased()) || muscleGroup.contains($0) }) {
+                return bodyPart
+            }
+        }
         return .other
     }
 
