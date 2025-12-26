@@ -1,39 +1,189 @@
 import Foundation
 
+enum TrainingPurpose: String, CaseIterable, Codable, Equatable {
+    case refresh
+    case hypertrophy
+    case diet
+    case tune
+    case other
+}
+
+enum TrainingLogSource: String, CaseIterable, Codable, Equatable {
+    case timer
+    case manual
+    case imported
+    case unknown
+}
+
+enum BodyPart: String, CaseIterable, Codable, Equatable {
+    case chest
+    case back
+    case legs
+    case shoulder
+    case arms
+    case core
+    case fullBody
+    case other
+}
+
+enum ExerciseCategory: String, CaseIterable, Codable, Equatable {
+    case strength
+    case cardio
+    case mobility
+    case other
+}
+
+struct TrainingCondition: Equatable {
+    var sleepHours: Double?
+    var sleepQuality: Int?
+    var fatigueLevel: Int?
+    var mood: Int?
+    var soreness: Int?
+    var conditionNote: String?
+    var overallCondition: Int?
+}
+
+struct TrainingSet: Identifiable, Equatable {
+    let id: UUID
+    var order: Int
+    var weightKg: Double?
+    var reps: Int?
+    var durationSec: Int?
+    var rpe: Double?
+    var restSec: Int?
+    var setNote: String?
+    var isWarmup: Bool
+    var isBodyweight: Bool
+
+    init(
+        id: UUID = UUID(),
+        order: Int,
+        weightKg: Double? = nil,
+        reps: Int? = nil,
+        durationSec: Int? = nil,
+        rpe: Double? = nil,
+        restSec: Int? = nil,
+        setNote: String? = nil,
+        isWarmup: Bool = false,
+        isBodyweight: Bool = false
+    ) {
+        self.id = id
+        self.order = order
+        self.weightKg = weightKg
+        self.reps = reps
+        self.durationSec = durationSec
+        self.rpe = rpe
+        self.restSec = restSec
+        self.setNote = setNote
+        self.isWarmup = isWarmup
+        self.isBodyweight = isBodyweight
+    }
+}
+
+struct TrainingExercise: Identifiable, Equatable {
+    let id: UUID
+    var name: String
+    var bodyPart: BodyPart
+    var category: ExerciseCategory
+    var sets: [TrainingSet]
+    var note: String?
+
+    init(
+        id: UUID = UUID(),
+        name: String,
+        bodyPart: BodyPart,
+        category: ExerciseCategory = .strength,
+        sets: [TrainingSet] = [],
+        note: String? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.bodyPart = bodyPart
+        self.category = category
+        self.sets = sets
+        self.note = note
+    }
+}
+
 struct TrainingLog: Identifiable, Equatable {
     let id: UUID
     var date: Date
     var startedAt: Date?
+    var endedAt: Date?
+    var sessionDurationSec: Int?
+    var purpose: TrainingPurpose?
+    var source: TrainingLogSource?
+    var condition: TrainingCondition?
+    var exercises: [TrainingExercise]
     var strengthExercises: [StrengthExerciseLog]
     var cardio: CardioExerciseLog?
     var healthSnapshot: HealthDataSnapshot?
+    var note: String?
+
+    // エイリアス（設計ドキュメントのフィールド名に合わせる）
+    var startTime: Date? {
+        get { startedAt }
+        set { startedAt = newValue }
+    }
+
+    var endTime: Date? {
+        get { endedAt }
+        set { endedAt = newValue }
+    }
 
     init(
         id: UUID = UUID(),
         date: Date,
         startedAt: Date? = nil,
+        endedAt: Date? = nil,
+        sessionDurationSec: Int? = nil,
+        purpose: TrainingPurpose? = nil,
+        source: TrainingLogSource? = nil,
+        condition: TrainingCondition? = nil,
+        exercises: [TrainingExercise] = [],
         strengthExercises: [StrengthExerciseLog] = [],
         cardio: CardioExerciseLog? = nil,
-        healthSnapshot: HealthDataSnapshot? = nil
+        healthSnapshot: HealthDataSnapshot? = nil,
+        note: String? = nil
     ) {
         self.id = id
         self.date = date
         self.startedAt = startedAt
+        self.endedAt = endedAt
+        self.sessionDurationSec = sessionDurationSec
+        self.purpose = purpose
+        self.source = source
+        self.condition = condition
+        self.exercises = exercises
         self.strengthExercises = strengthExercises
         self.cardio = cardio
         self.healthSnapshot = healthSnapshot
+        self.note = note
     }
 }
 
 struct StrengthExerciseLog: Identifiable, Equatable {
     let id: UUID
     var name: String
+    var bodyPart: BodyPart
+    var category: ExerciseCategory
     var sets: [StrengthSetLog]
+    var note: String?
 
-    init(id: UUID = UUID(), name: String, sets: [StrengthSetLog] = []) {
+    init(
+        id: UUID = UUID(),
+        name: String,
+        bodyPart: BodyPart = .other,
+        category: ExerciseCategory = .strength,
+        sets: [StrengthSetLog] = [],
+        note: String? = nil
+    ) {
         self.id = id
         self.name = name
+        self.bodyPart = bodyPart
+        self.category = category
         self.sets = sets
+        self.note = note
     }
 }
 
@@ -41,30 +191,61 @@ struct StrengthSetLog: Identifiable, Equatable {
     let id: UUID
     var weight: Double?
     var repetitions: Int?
+    var durationSec: Int?
+    var rpe: Double?
+    var restSec: Int?
+    var setNote: String?
+    var isWarmup: Bool
+    var isBodyweight: Bool
 
-    init(id: UUID = UUID(), weight: Double? = nil, repetitions: Int? = nil) {
+    init(
+        id: UUID = UUID(),
+        weight: Double? = nil,
+        repetitions: Int? = nil,
+        durationSec: Int? = nil,
+        rpe: Double? = nil,
+        restSec: Int? = nil,
+        setNote: String? = nil,
+        isWarmup: Bool = false,
+        isBodyweight: Bool = false
+    ) {
         self.id = id
         self.weight = weight
         self.repetitions = repetitions
+        self.durationSec = durationSec
+        self.rpe = rpe
+        self.restSec = restSec
+        self.setNote = setNote
+        self.isWarmup = isWarmup
+        self.isBodyweight = isBodyweight
     }
 }
 
 struct CardioExerciseLog: Identifiable, Equatable {
     let id: UUID
+    var name: String
+    var category: ExerciseCategory
     var distanceInKilometers: Double
     var durationInSeconds: TimeInterval
     var pace: Double
+    var note: String?
 
     init(
         id: UUID = UUID(),
+        name: String = "Cardio",
+        category: ExerciseCategory = .cardio,
         distanceInKilometers: Double,
         durationInSeconds: TimeInterval,
-        pace: Double
+        pace: Double,
+        note: String? = nil
     ) {
         self.id = id
+        self.name = name
+        self.category = category
         self.distanceInKilometers = distanceInKilometers
         self.durationInSeconds = durationInSeconds
         self.pace = pace
+        self.note = note
     }
 }
 
