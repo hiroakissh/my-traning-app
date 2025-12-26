@@ -26,7 +26,7 @@ struct RecordingView: View {
 
     private let restTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
-    init(bundle: Bundle = .main, healthDataProvider: HealthDataProviding = MockHealthDataProvider()) {
+    init(bundle: Bundle = .main, healthDataProvider: HealthDataProviding = HealthDataProviderFactory.make()) {
         let dataResult: Result<WorkoutData, BundleDecodingError>
         do {
             let data: WorkoutData = try bundle.decode("workout_menus.json")
