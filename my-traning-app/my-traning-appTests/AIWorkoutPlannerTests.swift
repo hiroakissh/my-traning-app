@@ -6,8 +6,11 @@ class MockFoundationModelClientForTest: FoundationModelClientProtocol {
     var planResponse = "Test Plan"
     var suggestionResponse = "Test Suggestion"
     var errorToThrow: Error?
+    var lastPlanPrompt: String?
+    var lastSuggestionPrompt: String?
 
     func generatePlan(prompt: String) async throws -> String {
+        lastPlanPrompt = prompt
         if let errorToThrow {
             throw errorToThrow
         }
@@ -15,6 +18,7 @@ class MockFoundationModelClientForTest: FoundationModelClientProtocol {
     }
 
     func generateTodaySuggestion(prompt: String) async throws -> String {
+        lastSuggestionPrompt = prompt
         if let errorToThrow {
             throw errorToThrow
         }
@@ -108,6 +112,17 @@ final class AIWorkoutPlannerTests: XCTestCase {
         XCTAssertFalse(planner.isLoading, "isLoading should be false after completion")
         XCTAssertNil(planner.errorMessage, "errorMessage should be nil on success")
         XCTAssertEqual(planner.todaySuggestion, expectedSuggestion, "todaySuggestion should match the mock response")
+    }
+
+    func test_createPlan_buildsPromptWithUserProfile() async {
+        await planner.createPlan(userProfile: dummyProfile, goal: "筋力アップ")
+
+        let prompt = mockClient.lastPlanPrompt ?? ""
+        XCTAssertTrue(prompt.contains("年齢: 30歳"))
+        XCTAssertTrue(prompt.contains("性別: 男性"))
+        XCTAssertTrue(prompt.contains("身長: 175cm"))
+        XCTAssertTrue(prompt.contains("体重: 70kg"))
+        XCTAssertTrue(prompt.contains("筋力アップ"))
     }
 
     func test_suggestTodayWorkout_failure() async {
