@@ -12,6 +12,8 @@ struct my_traning_appApp: App {
     var body: some Scene {
         WindowGroup {
             MainView()
+                .tint(AppColors.primary)
+                .preferredColorScheme(.dark)
         }
     }
 }
