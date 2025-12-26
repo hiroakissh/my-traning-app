@@ -39,6 +39,7 @@ enum HealthDataProviderError: Error {
     case healthDataNotAvailable
     case authorizationFailed
     case typeUnavailable(identifier: HKQuantityTypeIdentifier)
+    case authorizationDeniedOrRestricted
 }
 
 @available(iOS 17.0, *)
@@ -70,35 +71,48 @@ final class LiveHealthDataProvider: HealthDataProviding {
             }
         }
 
-        guard success else {
+        if success == false {
             throw HealthDataProviderError.authorizationFailed
         }
     }
 
     func fetchSnapshot(since start: Date) async throws -> HealthDataSnapshot {
         let end = Date()
+        do {
+            async let averageHeartRate = fetchAverage(.heartRate, unit: HKUnit.count().unitDivided(by: .minute()), start: start, end: end)
+            async let restingHeartRate = fetchAverage(.restingHeartRate, unit: HKUnit.count().unitDivided(by: .minute()), start: start, end: end)
+            async let activeEnergy = fetchSum(.activeEnergyBurned, unit: .kilocalorie(), start: start, end: end)
+            async let basalEnergy = fetchSum(.basalEnergyBurned, unit: .kilocalorie(), start: start, end: end)
+            async let distance = fetchSum(.distanceWalkingRunning, unit: .meter(), start: start, end: end)
+            async let steps = fetchSum(.stepCount, unit: .count(), start: start, end: end)
+            async let vo2Max = fetchAverage(.vo2Max, unit: HKUnit(from: "mL/(kg*min)"), start: start, end: end)
 
-        async let averageHeartRate = fetchAverage(.heartRate, unit: HKUnit.count().unitDivided(by: .minute()), start: start, end: end)
-        async let restingHeartRate = fetchAverage(.restingHeartRate, unit: HKUnit.count().unitDivided(by: .minute()), start: start, end: end)
-        async let activeEnergy = fetchSum(.activeEnergyBurned, unit: .kilocalorie(), start: start, end: end)
-        async let basalEnergy = fetchSum(.basalEnergyBurned, unit: .kilocalorie(), start: start, end: end)
-        async let distance = fetchSum(.distanceWalkingRunning, unit: .meter(), start: start, end: end)
-        async let steps = fetchSum(.stepCount, unit: .count(), start: start, end: end)
-        async let vo2Max = fetchAverage(.vo2Max, unit: HKUnit(from: "mL/(kg*min)"), start: start, end: end)
-
-        let snapshot = HealthDataSnapshot(
-            start: start,
-            end: end,
-            averageHeartRate: try await averageHeartRate,
-            restingHeartRate: try await restingHeartRate,
-            activeEnergyBurned: try await activeEnergy,
-            basalEnergyBurned: try await basalEnergy,
-            distanceWalkingRunning: try await distance.map { $0 / 1000 }, // to km
-            stepCount: try await steps.map { Int($0) },
-            vo2Max: try await vo2Max
-        )
-
-        return snapshot
+            let snapshot = HealthDataSnapshot(
+                start: start,
+                end: end,
+                averageHeartRate: try await averageHeartRate,
+                restingHeartRate: try await restingHeartRate,
+                activeEnergyBurned: try await activeEnergy,
+                basalEnergyBurned: try await basalEnergy,
+                distanceWalkingRunning: try await distance.map { $0 / 1000 },
+                stepCount: try await steps.map { Int($0) },
+                vo2Max: try await vo2Max
+            )
+            return snapshot
+        } catch HealthDataProviderError.authorizationDeniedOrRestricted {
+            // Return an empty snapshot when authorization is denied or restricted
+            return HealthDataSnapshot(
+                start: start,
+                end: end,
+                averageHeartRate: nil,
+                restingHeartRate: nil,
+                activeEnergyBurned: nil,
+                basalEnergyBurned: nil,
+                distanceWalkingRunning: nil,
+                stepCount: nil,
+                vo2Max: nil
+            )
+        }
     }
 
     private func fetchAverage(
@@ -140,6 +154,10 @@ final class LiveHealthDataProvider: HealthDataProviding {
         return try await withCheckedThrowingContinuation { continuation in
             let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: options) { _, statistics, error in
                 if let error {
+                    if let hkError = error as? HKError, hkError.code == .errorAuthorizationDenied || hkError.code == .errorAuthorizationNotDetermined {
+                        continuation.resume(throwing: HealthDataProviderError.authorizationDeniedOrRestricted)
+                        return
+                    }
                     continuation.resume(throwing: error)
                     return
                 }
