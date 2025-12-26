@@ -74,18 +74,6 @@ final class LiveHealthDataProvider: HealthDataProviding {
         if success == false {
             throw HealthDataProviderError.authorizationFailed
         }
-        // Validate that authorization was actually granted for requested types
-        for type in readTypes {
-            let status = healthStore.authorizationStatus(for: type)
-            switch status {
-            case .sharingAuthorized:
-                continue
-            case .sharingDenied, .notDetermined:
-                throw HealthDataProviderError.authorizationDeniedOrRestricted
-            @unknown default:
-                throw HealthDataProviderError.authorizationDeniedOrRestricted
-            }
-        }
     }
 
     func fetchSnapshot(since start: Date) async throws -> HealthDataSnapshot {
@@ -166,6 +154,10 @@ final class LiveHealthDataProvider: HealthDataProviding {
         return try await withCheckedThrowingContinuation { continuation in
             let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: options) { _, statistics, error in
                 if let error {
+                    if let hkError = error as? HKError, hkError.code == .errorAuthorizationDenied || hkError.code == .errorAuthorizationNotDetermined {
+                        continuation.resume(throwing: HealthDataProviderError.authorizationDeniedOrRestricted)
+                        return
+                    }
                     continuation.resume(throwing: error)
                     return
                 }
