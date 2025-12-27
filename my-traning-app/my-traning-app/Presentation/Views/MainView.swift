@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 struct MainView: View {
     var body: some View {
@@ -30,5 +31,14 @@ struct MainView: View {
 
 #Preview {
     MainView()
-        .modelContainer(for: ActivePlan.self, inMemory: true)
+        .modelContainer(
+            for: [
+                ActivePlan.self,
+                TrainingLog.self,
+                TrainingExercise.self,
+                TrainingSet.self,
+                TrainingCondition.self
+            ] as [any PersistentModel.Type],
+            inMemory: true
+        )
 }

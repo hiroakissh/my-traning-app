@@ -1,346 +1,344 @@
 import SwiftUI
+import SwiftData
 
 struct RecordingView: View {
-    private struct Activity: Identifiable, Equatable {
-        let id = UUID()
-        let name: String
-        let icon: String
-        let color: Color
-    }
+    @Environment(\.modelContext) private var modelContext
+    private let workoutGroupsResult: Result<[WorkoutGroup], BundleDecodingError>
+    private let validator = RecordingSessionValidator()
+    private let logBuilder = RecordingSessionLogBuilder()
+    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
-    private enum GoalType: String, CaseIterable, Identifiable {
-        case time = "時間"
-        case distance = "距離"
-        case calorie = "カロリー"
-        case heartRate = "心拍数"
+    @State private var selectedGroupIndex = 0
+    @State private var selectedMenuItems = Set<WorkoutMenuItem>()
+    @State private var selectedPurpose: TrainingPurpose?
+    @State private var timerState = RecordingTimerState()
+    @State private var statusMessage: String?
+    @State private var statusKind: StatusKind?
+    @State private var isSaving = false
 
-        var id: String { rawValue }
-        var symbol: String {
-            switch self {
-            case .time: return "clock.fill"
-            case .distance: return "location.fill"
-            case .calorie: return "flame.fill"
-            case .heartRate: return "heart.fill"
-            }
+    init(bundle: Bundle = .main) {
+        let dataResult: Result<WorkoutData, BundleDecodingError>
+        do {
+            let data: WorkoutData = try bundle.decode("workout_menus.json")
+            dataResult = .success(data)
+        } catch let decodingError as BundleDecodingError {
+            dataResult = .failure(decodingError)
+        } catch {
+            dataResult = .failure(.dataReadFailed(file: "workout_menus.json", reason: error.localizedDescription))
         }
+        self.workoutGroupsResult = dataResult.map { $0.workoutMenus }
     }
 
-    @State private var activities: [Activity] = [
-        Activity(name: "ランニング", icon: "figure.run", color: AppColors.primary),
-        Activity(name: "サイクリング", icon: "bicycle", color: Color.gray),
-        Activity(name: "筋トレ", icon: "hammer.fill", color: AppColors.secondary)
-    ]
-    @State private var selectedActivityIndex: Int = 0
+    private var startValidation: RecordingValidationResult {
+        validator.validateForStart(purpose: selectedPurpose, selectedMenuCount: selectedMenuItems.count)
+    }
 
-    @State private var selectedGoal: GoalType = .time
-    @State private var goalValue: Double = 45 // minutes
-    @State private var voiceCoachEnabled = true
-    @State private var hapticsEnabled = true
-    @State private var isRunning = false
-
-    private var selectedActivity: Activity {
-        activities[selectedActivityIndex]
+    private var finishValidation: RecordingValidationResult {
+        validator.validateForFinish(
+            purpose: selectedPurpose,
+            selectedMenuCount: selectedMenuItems.count,
+            elapsedSeconds: timerState.elapsedSeconds,
+            hasStarted: timerState.hasStarted
+        )
     }
 
     var body: some View {
         NavigationStack {
-            ZStack(alignment: .bottom) {
-                background
+            content
+                .navigationTitle("トレーニング記録")
+        }
+        .onReceive(timer) { now in
+            timerState.tick(now: now)
+        }
+        .onChange(of: selectedPurpose) { _ in
+            clearStatus()
+        }
+    }
 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: AppLayout.grid * 2.5) {
-                        header
-                        activitySelector
-                        goalSelector
-                        timerRing
-                        toggles
-                        Spacer(minLength: AppLayout.grid * 6)
-                    }
-                    .padding(.horizontal, AppLayout.grid * 2.5)
-                    .padding(.top, AppLayout.grid * 3)
-                    .padding(.bottom, AppLayout.grid * 8)
-                }
-
-                startButton
+    @ViewBuilder
+    private var content: some View {
+        switch workoutGroupsResult {
+        case .success(let groups):
+            if groups.isEmpty {
+                EmptyStateView(title: "トレーニングメニューが登録されていません。", message: "管理画面からメニューを追加してください。")
+            } else {
+                workoutMenuList(groups: groups)
             }
-            .navigationTitle("")
-            .navigationBarHidden(true)
+        case .failure(let error):
+            EmptyStateView(title: "メニューを読み込めませんでした", message: error.localizedDescription)
+                .padding()
         }
     }
 
-    // MARK: - Sections
+    @ViewBuilder
+    private func workoutMenuList(groups: [WorkoutGroup]) -> some View {
+        let safeIndex = min(selectedGroupIndex, max(groups.count - 1, 0))
 
-    private var background: some View {
-        LinearGradient(
-            colors: [
-                AppColors.background,
-                AppColors.surface.opacity(0.92)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-        .ignoresSafeArea()
-    }
+        List {
+            if let statusMessage, let statusKind {
+                Section {
+                    statusBanner(message: statusMessage, kind: statusKind)
+                }
+            }
 
-    private var header: some View {
-        HStack {
-            Spacer()
-            Text("ワークアウト設定")
-                .font(AppTypography.title(20))
-                .foregroundColor(AppColors.textPrimary)
-            Spacer()
-        }
-    }
+            Section {
+                Picker("部位", selection: $selectedGroupIndex) {
+                    ForEach(0..<groups.count, id: \.self) { index in
+                        Text(groups[index].muscleGroup).tag(index)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
 
-    private var activitySelector: some View {
-        VStack(alignment: .leading, spacing: AppLayout.grid * 1.25) {
-            Text("種目を選択")
-                .font(AppTypography.title(18))
-                .foregroundColor(AppColors.textPrimary)
+            Section(header: Text("目標タイプ")) {
+                Picker("目標タイプ", selection: $selectedPurpose) {
+                    Text("未選択").tag(Optional<TrainingPurpose>.none)
+                    ForEach(TrainingPurpose.allCases, id: \.self) { purpose in
+                        Text(purpose.displayName).tag(Optional(purpose))
+                    }
+                }
+                .pickerStyle(.segmented)
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: AppLayout.grid * 1.25) {
-                    ForEach(Array(activities.enumerated()), id: \.element.id) { index, activity in
-                        Button {
-                            selectedActivityIndex = index
-                        } label: {
-                            HStack(spacing: AppLayout.grid) {
-                                Image(systemName: activity.icon)
-                                    .font(.system(size: 16, weight: .semibold))
-                                Text(activity.name)
-                                    .font(AppTypography.body(15, weight: .semibold))
+                if let message = startValidation.message, !startValidation.isValid {
+                    validationMessage(message)
+                }
+            }
+
+            Section(header: Text("メニュー")) {
+                ForEach(groups[safeIndex].menus, id: \.id) { item in
+                    Button(action: {
+                        if selectedMenuItems.contains(item) {
+                            selectedMenuItems.remove(item)
+                        } else {
+                            selectedMenuItems.insert(item)
+                        }
+                        clearStatus()
+                    }) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(item.name)
+                                    .font(.headline)
+                                Text(item.description)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
                             }
-                            .padding(.horizontal, AppLayout.grid * 2.5)
-                            .padding(.vertical, AppLayout.grid * 1.4)
-                            .frame(minWidth: 140)
-                            .background(
-                                Capsule()
-                                    .fill(index == selectedActivityIndex ? AppColors.primary : AppColors.surface2.opacity(0.92))
-                                    .overlay(
-                                        Capsule()
-                                            .stroke(AppColors.strokeGlow, lineWidth: 1)
-                                    )
-                                    .shadow(color: index == selectedActivityIndex ? AppColors.primary.opacity(0.3) : Color.black.opacity(0.2), radius: 12, x: 0, y: 8)
-                            )
-                            .foregroundColor(index == selectedActivityIndex ? AppColors.background : AppColors.textSecondary)
+                            Spacer()
+                            if selectedMenuItems.contains(item) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.accentColor)
+                            }
                         }
                     }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            Section(header: Text("セッション")) {
+                selectionSummary
+                timerView
+                controlButtons
+
+                saveButton
+
+                if timerState.hasStarted, let message = finishValidation.message, !finishValidation.isValid {
+                    validationMessage(message)
                 }
             }
         }
+        .listStyle(.insetGrouped)
     }
 
-    private var goalSelector: some View {
-        VStack(alignment: .leading, spacing: AppLayout.grid * 1.5) {
+    private var selectionSummary: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("\(selectedMenuItems.count)件のメニューを選択中")
+                .font(.headline)
+            Text("記録開始には目標タイプとメニュー選択が必要です。保存は計測時間の条件も満たしたときのみ有効になります。")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var timerView: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("経過時間")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            Text(RecordingTimeFormatter.string(from: timerState.elapsedSeconds))
+                .font(.system(size: 32, weight: .bold, design: .monospaced))
+                .accessibilityLabel("経過時間 \(RecordingTimeFormatter.string(from: timerState.elapsedSeconds))")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var controlButtons: some View {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("目標設定")
-                    .font(AppTypography.title(18))
-                    .foregroundColor(AppColors.textPrimary)
-                Spacer()
-                Button(action: {}) {
-                    Text("編集")
-                        .font(AppTypography.body(14, weight: .semibold))
-                        .foregroundColor(AppColors.primary)
-                }
-            }
-
-            HStack(spacing: 0) {
-                ForEach(GoalType.allCases) { type in
-                    Button {
-                        selectedGoal = type
-                    } label: {
-                        VStack(spacing: AppLayout.grid * 0.5) {
-                            Image(systemName: type.symbol)
-                            Text(type.rawValue)
-                                .font(AppTypography.body(14, weight: .semibold))
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, AppLayout.grid * 1.4)
-                        .foregroundColor(selectedGoal == type ? AppColors.background : AppColors.textSecondary)
-                        .background(
-                            Capsule()
-                                .fill(selectedGoal == type ? AppColors.primary : AppColors.surface.opacity(0.8))
-                        )
+                if timerState.isRunning {
+                    Button(action: { handlePause() }) {
+                        Label("一時停止", systemImage: "pause.circle")
+                            .frame(maxWidth: .infinity)
                     }
+                    .buttonStyle(.borderedProminent)
+                } else {
+                    Button(action: { handleStartOrResume() }) {
+                        Label(timerState.hasStarted ? "計測を再開" : "記録を開始", systemImage: timerState.hasStarted ? "play.circle" : "stopwatch")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!startValidation.isValid)
                 }
-            }
-            .padding(6)
-            .background(
-                Capsule()
-                    .fill(AppColors.surface.opacity(0.7))
-                    .overlay(Capsule().stroke(AppColors.strokeGlow, lineWidth: 1))
-            )
-        }
-    }
 
-    private var timerRing: some View {
-        VStack(spacing: AppLayout.grid * 1.5) {
-            ZStack {
-                Circle()
-                    .stroke(AppColors.surface2.opacity(0.6), lineWidth: 18)
-                    .frame(width: 260, height: 260)
-                Circle()
-                    .trim(from: 0, to: min(goalProgress, 1))
-                    .stroke(
-                        LinearGradient(
-                            colors: [AppColors.primary, AppColors.secondary],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ),
-                        style: StrokeStyle(lineWidth: 18, lineCap: .round)
-                    )
-                    .rotationEffect(.degrees(-90))
-                    .frame(width: 260, height: 260)
-                    .shadow(color: AppColors.primary.opacity(0.3), radius: 16, x: 0, y: 10)
-
-                VStack(spacing: AppLayout.grid * 0.8) {
-                    Text(formattedGoal)
-                        .font(AppTypography.hudNumber(44, weight: .semibold))
-                        .foregroundColor(AppColors.textPrimary)
-                    Text(selectedGoal.rawValue)
-                        .font(AppTypography.body(15, weight: .semibold))
-                        .foregroundColor(AppColors.primary)
+                Button(action: { handleReset() }) {
+                    Label("リセット", systemImage: "arrow.counterclockwise")
+                        .frame(maxWidth: .infinity)
                 }
+                .buttonStyle(.bordered)
+                .disabled(!timerState.hasStarted && selectedMenuItems.isEmpty && selectedPurpose == nil)
             }
-
-            Slider(value: $goalValue, in: goalRange.lowerBound...goalRange.upperBound, step: goalStep)
-                .tint(AppColors.primary)
-                .padding(.horizontal, AppLayout.grid * 2)
-        }
-        .padding(.vertical, AppLayout.grid * 2)
-    }
-
-    private var toggles: some View {
-        VStack(spacing: AppLayout.grid * 1.5) {
-            ToggleCard(
-                icon: "person.wave.2.fill",
-                title: "音声コーチ",
-                subtitle: "区間ごとの音声ガイド",
-                isOn: $voiceCoachEnabled
-            )
-            ToggleCard(
-                icon: "wave.3.right",
-                title: "ハプティック",
-                subtitle: "アラート時の振動",
-                isOn: $hapticsEnabled
-            )
         }
     }
 
-    private var startButton: some View {
-        Button {
-            isRunning.toggle()
-        } label: {
-            HStack(spacing: AppLayout.grid * 1.5) {
-                Image(systemName: isRunning ? "pause.fill" : "play.fill")
-                Text(isRunning ? "一時停止" : "スタート")
-                    .font(AppTypography.body(18, weight: .semibold))
+    private var saveButton: some View {
+        Button(action: { handleSave() }) {
+            if isSaving {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+            } else {
+                Label("終了して保存", systemImage: "externaldrive.badge.checkmark")
+                    .frame(maxWidth: .infinity)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, AppLayout.grid * 2)
-            .background(
-                Capsule()
-                    .fill(AppColors.primary)
-                    .shadow(color: AppColors.primary.opacity(0.4), radius: 18, x: 0, y: 10)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(.green)
+        .disabled(isSaving || !finishValidation.isValid)
+    }
+
+    private func validationMessage(_ message: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundColor(.orange)
+            Text(message)
+                .font(.caption)
+                .foregroundColor(.primary)
+        }
+        .padding(8)
+        .background(Color(.systemOrange).opacity(0.12))
+        .cornerRadius(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func statusBanner(message: String, kind: StatusKind) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: kind == .success ? "checkmark.seal.fill" : "xmark.octagon.fill")
+                .foregroundColor(kind == .success ? .green : .red)
+            Text(message)
+                .font(.caption)
+                .foregroundColor(.primary)
+        }
+        .padding(10)
+        .background(kind == .success ? Color(.systemGreen).opacity(0.12) : Color(.systemRed).opacity(0.12))
+        .cornerRadius(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func handleStartOrResume() {
+        guard startValidation.isValid else {
+            statusKind = .error
+            statusMessage = startValidation.message
+            return
+        }
+        statusMessage = nil
+        statusKind = nil
+
+        if timerState.hasStarted {
+            timerState.resume()
+        } else {
+            timerState.start()
+        }
+    }
+
+    private func handlePause() {
+        timerState.pause()
+    }
+
+    private func handleReset() {
+        timerState.reset()
+        statusMessage = nil
+        statusKind = nil
+    }
+
+    private func handleSave() {
+        var finalizedTimerState = timerState
+        finalizedTimerState.stop(now: Date())
+
+        let validation = validator.validateForFinish(
+            purpose: selectedPurpose,
+            selectedMenuCount: selectedMenuItems.count,
+            elapsedSeconds: finalizedTimerState.elapsedSeconds,
+            hasStarted: finalizedTimerState.hasStarted
+        )
+
+        guard validation.isValid, let purpose = selectedPurpose else {
+            statusKind = .error
+            statusMessage = validation.message
+            timerState = finalizedTimerState
+            return
+        }
+
+        timerState = finalizedTimerState
+
+        isSaving = true
+        do {
+            let log = logBuilder.makeLog(
+                purpose: purpose,
+                selectedMenus: Array(selectedMenuItems),
+                timerState: finalizedTimerState,
+                date: finalizedTimerState.startTime ?? Date()
             )
-            .foregroundColor(AppColors.background)
-            .padding(.horizontal, AppLayout.grid * 2.5)
-            .padding(.bottom, AppLayout.grid * 2.5)
+            modelContext.insert(log)
+            try modelContext.save()
+            statusKind = .success
+            statusMessage = "トレーニングを保存しました。"
+            selectedMenuItems.removeAll()
+            selectedPurpose = nil
+            timerState.reset()
+        } catch {
+            statusKind = .error
+            statusMessage = "保存に失敗しました: \(error.localizedDescription)"
         }
+        isSaving = false
     }
 
-    // MARK: - Helpers
-
-    private var goalProgress: Double {
-        switch selectedGoal {
-        case .time:
-            return goalValue / 120 // assume max 120 minutes
-        case .distance:
-            return goalValue / 20
-        case .calorie:
-            return goalValue / 1200
-        case .heartRate:
-            return goalValue / 200
-        }
-    }
-
-    private var goalRange: ClosedRange<Double> {
-        switch selectedGoal {
-        case .time: return 10...120
-        case .distance: return 1...30
-        case .calorie: return 100...1200
-        case .heartRate: return 80...200
-        }
-    }
-
-    private var goalStep: Double {
-        switch selectedGoal {
-        case .time: return 5
-        case .distance: return 0.5
-        case .calorie: return 50
-        case .heartRate: return 5
-        }
-    }
-
-    private var formattedGoal: String {
-        switch selectedGoal {
-        case .time:
-            let minutes = Int(goalValue)
-            let seconds = Int((goalValue - Double(minutes)) * 60)
-            return String(format: "%02d:%02d", minutes, seconds)
-        case .distance:
-            return String(format: "%.1f km", goalValue)
-        case .calorie:
-            return "\(Int(goalValue)) kcal"
-        case .heartRate:
-            return "\(Int(goalValue)) bpm"
-        }
+    private func clearStatus() {
+        statusMessage = nil
+        statusKind = nil
     }
 }
 
-// MARK: - Components
+private enum StatusKind {
+    case success
+    case error
+}
 
-private struct ToggleCard: View {
-    let icon: String
+private struct EmptyStateView: View {
     let title: String
-    let subtitle: String
-    @Binding var isOn: Bool
+    let message: String
 
     var body: some View {
-        HStack(spacing: AppLayout.grid * 1.25) {
-            ZStack {
-                Circle()
-                    .fill(AppColors.surface2.opacity(0.9))
-                    .frame(width: 44, height: 44)
-                Image(systemName: icon)
-                    .foregroundColor(AppColors.primary)
-                    .font(.system(size: 18, weight: .semibold))
-            }
-
-            VStack(alignment: .leading, spacing: AppLayout.grid * 0.4) {
-                Text(title)
-                    .font(AppTypography.body(15, weight: .semibold))
-                    .foregroundColor(AppColors.textPrimary)
-                Text(subtitle)
-                    .font(AppTypography.label(12))
-                    .foregroundColor(AppColors.textSecondary)
-            }
-            Spacer()
-            Toggle("", isOn: $isOn)
-                .labelsHidden()
-                .tint(AppColors.primary)
+        VStack(spacing: 12) {
+            Text(title)
+                .font(.headline)
+            Text(message)
+                .font(.subheadline)
+                .multilineTextAlignment(.center)
+                .foregroundColor(.secondary)
         }
-        .padding(.horizontal, AppLayout.grid * 1.75)
-        .padding(.vertical, AppLayout.grid * 1.35)
-        .background(
-            RoundedRectangle(cornerRadius: AppLayout.cardRadius, style: .continuous)
-                .fill(AppColors.surface.opacity(0.9))
-                .overlay(RoundedRectangle(cornerRadius: AppLayout.cardRadius, style: .continuous).stroke(AppColors.strokeGlow, lineWidth: 1))
-                .shadow(color: AppColors.primary.opacity(0.16), radius: 14, x: 0, y: 10)
-        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
 #Preview {
     RecordingView()
+        .modelContainer(for: [TrainingLog.self, TrainingCondition.self, TrainingExercise.self, TrainingSet.self] as [any PersistentModel.Type], inMemory: true)
 }

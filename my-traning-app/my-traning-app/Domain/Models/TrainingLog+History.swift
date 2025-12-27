@@ -1,23 +1,26 @@
 import Foundation
 
-extension TrainingPurpose {
-    var displayName: String {
-        switch self {
-        case .refresh: return "リフレッシュ"
-        case .hypertrophy: return "筋肥大"
-        case .diet: return "減量"
-        case .tune: return "調整"
-        case .other: return "その他"
-        }
-    }
-}
-
 extension ExerciseCategory {
     var displayName: String {
         switch self {
         case .strength: return "筋トレ"
         case .cardio: return "有酸素"
         case .mobility: return "モビリティ"
+        case .other: return "その他"
+        }
+    }
+}
+
+extension BodyPart {
+    var displayName: String {
+        switch self {
+        case .chest: return "胸"
+        case .back: return "背中"
+        case .legs: return "脚"
+        case .shoulder: return "肩"
+        case .arms: return "腕"
+        case .core: return "体幹"
+        case .fullBody: return "全身"
         case .other: return "その他"
         }
     }

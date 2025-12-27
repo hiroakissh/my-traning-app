@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 enum TrainingPurpose: String, CaseIterable, Codable, Equatable {
     case refresh
@@ -6,6 +7,21 @@ enum TrainingPurpose: String, CaseIterable, Codable, Equatable {
     case diet
     case tune
     case other
+
+    var displayName: String {
+        switch self {
+        case .refresh:
+            return "リフレッシュ"
+        case .hypertrophy:
+            return "筋肥大"
+        case .diet:
+            return "減量"
+        case .tune:
+            return "調整"
+        case .other:
+            return "その他"
+        }
+    }
 }
 
 enum TrainingLogSource: String, CaseIterable, Codable, Equatable {
@@ -33,7 +49,9 @@ enum ExerciseCategory: String, CaseIterable, Codable, Equatable {
     case other
 }
 
-struct TrainingCondition: Equatable {
+@Model
+final class TrainingCondition: Identifiable {
+    @Attribute(.unique) var id: UUID
     var sleepHours: Double?
     var sleepQuality: Int?
     var fatigueLevel: Int?
@@ -41,10 +59,31 @@ struct TrainingCondition: Equatable {
     var soreness: Int?
     var conditionNote: String?
     var overallCondition: Int?
+
+    init(
+        id: UUID = UUID(),
+        sleepHours: Double? = nil,
+        sleepQuality: Int? = nil,
+        fatigueLevel: Int? = nil,
+        mood: Int? = nil,
+        soreness: Int? = nil,
+        conditionNote: String? = nil,
+        overallCondition: Int? = nil
+    ) {
+        self.id = id
+        self.sleepHours = sleepHours
+        self.sleepQuality = sleepQuality
+        self.fatigueLevel = fatigueLevel
+        self.mood = mood
+        self.soreness = soreness
+        self.conditionNote = conditionNote
+        self.overallCondition = overallCondition
+    }
 }
 
-struct TrainingSet: Identifiable, Equatable {
-    let id: UUID
+@Model
+final class TrainingSet: Identifiable {
+    @Attribute(.unique) var id: UUID
     var order: Int
     var weightKg: Double?
     var reps: Int?
@@ -80,12 +119,13 @@ struct TrainingSet: Identifiable, Equatable {
     }
 }
 
-struct TrainingExercise: Identifiable, Equatable {
-    let id: UUID
+@Model
+final class TrainingExercise: Identifiable {
+    @Attribute(.unique) var id: UUID
     var name: String
     var bodyPart: BodyPart
     var category: ExerciseCategory
-    var sets: [TrainingSet]
+    @Relationship(deleteRule: .cascade) var sets: [TrainingSet]
     var note: String?
 
     init(
@@ -105,27 +145,30 @@ struct TrainingExercise: Identifiable, Equatable {
     }
 }
 
-struct TrainingLog: Identifiable, Equatable {
-    let id: UUID
+@Model
+final class TrainingLog: Identifiable {
+    @Attribute(.unique) var id: UUID
     var date: Date
     var startedAt: Date?
     var endedAt: Date?
-    var sessionDurationSec: Int?
-    var purpose: TrainingPurpose?
-    var source: TrainingLogSource?
+    var sessionDurationSec: Int
+    var purpose: TrainingPurpose
+    var source: TrainingLogSource
     var condition: TrainingCondition?
-    var exercises: [TrainingExercise]
-    var strengthExercises: [StrengthExerciseLog]
-    var cardio: CardioExerciseLog?
-    var healthSnapshot: HealthDataSnapshot?
+    @Relationship(deleteRule: .cascade) var exercises: [TrainingExercise]
+    @Transient var strengthExercises: [StrengthExerciseLog] = []
+    @Transient var cardio: CardioExerciseLog?
+    @Transient var healthSnapshot: HealthDataSnapshot?
     var note: String?
 
     // エイリアス（設計ドキュメントのフィールド名に合わせる）
+    @Transient
     var startTime: Date? {
         get { startedAt }
         set { startedAt = newValue }
     }
 
+    @Transient
     var endTime: Date? {
         get { endedAt }
         set { endedAt = newValue }
@@ -136,9 +179,9 @@ struct TrainingLog: Identifiable, Equatable {
         date: Date,
         startedAt: Date? = nil,
         endedAt: Date? = nil,
-        sessionDurationSec: Int? = nil,
-        purpose: TrainingPurpose? = nil,
-        source: TrainingLogSource? = nil,
+        sessionDurationSec: Int,
+        purpose: TrainingPurpose,
+        source: TrainingLogSource,
         condition: TrainingCondition? = nil,
         exercises: [TrainingExercise] = [],
         strengthExercises: [StrengthExerciseLog] = [],
