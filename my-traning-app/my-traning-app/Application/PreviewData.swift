@@ -8,7 +8,7 @@ enum PreviewData {
             TrainingExercise.self,
             TrainingSet.self,
             TrainingCondition.self
-        ])
+        ] as [any PersistentModel.Type])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         let container = try! ModelContainer(for: schema, configurations: configuration)
         let context = ModelContext(container)

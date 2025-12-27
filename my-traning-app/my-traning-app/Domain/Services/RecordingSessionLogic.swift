@@ -188,7 +188,7 @@ struct RecordingSessionLogBuilder {
         selectedMenus: [WorkoutMenuItem],
         timerState: RecordingTimerState,
         date: Date = Date(),
-        source: LogSource = .timer
+        source: TrainingLogSource = .timer
     ) -> TrainingLog {
         let startTime = timerState.startTime ?? date
         let endTime = timerState.endTime ?? startTime.addingTimeInterval(TimeInterval(timerState.elapsedSeconds))
@@ -200,8 +200,8 @@ struct RecordingSessionLogBuilder {
 
         return TrainingLog(
             date: logDate,
-            startTime: startTime,
-            endTime: endTime,
+            startedAt: startTime,
+            endedAt: endTime,
             sessionDurationSec: timerState.elapsedSeconds,
             purpose: purpose,
             source: source,

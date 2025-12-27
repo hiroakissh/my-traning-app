@@ -340,5 +340,5 @@ private struct EmptyStateView: View {
 
 #Preview {
     RecordingView()
-        .modelContainer(for: [TrainingLog.self, TrainingCondition.self, TrainingExercise.self, TrainingSet.self], inMemory: true)
+        .modelContainer(for: [TrainingLog.self, TrainingCondition.self, TrainingExercise.self, TrainingSet.self] as [any PersistentModel.Type], inMemory: true)
 }

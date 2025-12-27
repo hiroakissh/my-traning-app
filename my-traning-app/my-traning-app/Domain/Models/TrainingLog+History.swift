@@ -1,17 +1,5 @@
 import Foundation
 
-extension TrainingPurpose {
-    var displayName: String {
-        switch self {
-        case .refresh: return "リフレッシュ"
-        case .hypertrophy: return "筋肥大"
-        case .diet: return "減量"
-        case .tune: return "調整"
-        case .other: return "その他"
-        }
-    }
-}
-
 extension ExerciseCategory {
     var displayName: String {
         switch self {

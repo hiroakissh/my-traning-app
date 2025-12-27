@@ -11,7 +11,7 @@ struct my_traning_appApp: App {
             TrainingSet.self,
             TrainingCondition.self,
             ActivePlan.self
-        ])
+        ] as [any PersistentModel.Type])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         return try! ModelContainer(for: schema, configurations: configuration)
     }()

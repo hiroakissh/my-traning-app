@@ -25,6 +25,8 @@ struct HistoryView: View {
     @State private var selectedCategory: ExerciseCategory?
     @State private var selectedDate: Date = Date()
 
+    init() {}
+
     private var historyItems: [TrainingHistoryItem] {
         TrainingHistoryBuilder.makeItems(from: logs, calendar: calendar)
     }
