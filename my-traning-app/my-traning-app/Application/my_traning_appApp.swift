@@ -11,9 +11,16 @@ struct my_traning_appApp: App {
             TrainingSet.self,
             TrainingCondition.self,
             ActivePlan.self
-        ] as [any PersistentModel.Type])
-        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-        return try! ModelContainer(for: schema, configurations: configuration)
+        ])
+
+        let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: isRunningTests)
+
+        do {
+            return try ModelContainer(for: schema, configurations: configuration)
+        } catch {
+            fatalError("Failed to create ModelContainer: \(error)")
+        }
     }()
 
     var body: some Scene {

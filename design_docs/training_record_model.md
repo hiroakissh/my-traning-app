@@ -181,3 +181,9 @@
 | core | 体幹 |
 | fullBody | 全身 |
 | other | その他 |
+
+## HUD/分析向け集計ヘルパー
+
+- `TrainingLogAnalytics.dailySummaries(from:calendar:)` で日次サマリを生成。`totalDurationSec` と筋トレビッグ3のボリュームを代表する `totalVolumeKg` を返し、目的別セッション数 (`purposeCounts`) を含む。
+- `TrainingLogAnalytics.weeklySummaries(from:calendar:)` で週次サマリを生成。`weekStart`（週初日）をキーに日次サマリを束ね、ホーム/履歴の週次グラフに供給する。
+- ボリューム計算は`isWarmup == true`を除外し、`weightKg * reps` の積のみを合計する。時間・距離系のセットはボリューム0として扱う。
