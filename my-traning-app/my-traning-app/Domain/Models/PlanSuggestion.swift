@@ -34,7 +34,7 @@ enum PlanHorizon: String, Codable, CaseIterable {
     }
 }
 
-struct PlanSuggestion: Identifiable, Equatable {
+struct PlanSuggestion: Identifiable, Codable, Equatable {
     let id: UUID
     let horizon: PlanHorizon
     let title: String

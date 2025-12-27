@@ -1,11 +1,5 @@
 import Foundation
 
-enum PlanHorizon: String, Codable, CaseIterable {
-    case longTerm
-    case midTerm
-    case shortTerm
-}
-
 enum PlanStatus: String, Codable, CaseIterable {
     case planned
     case inProgress
@@ -46,20 +40,6 @@ struct PlanMetric: Identifiable, Codable, Equatable {
         guard targetValue > 0 else { return 0 }
         let raw = currentValue / targetValue
         return min(max(raw, 0), 1)
-    }
-}
-
-struct PlanSuggestion: Identifiable, Codable, Equatable {
-    let id: UUID
-    var message: String
-    var createdAt: Date
-    var source: SuggestionSource
-
-    init(id: UUID = UUID(), message: String, createdAt: Date = Date(), source: SuggestionSource) {
-        self.id = id
-        self.message = message
-        self.createdAt = createdAt
-        self.source = source
     }
 }
 
