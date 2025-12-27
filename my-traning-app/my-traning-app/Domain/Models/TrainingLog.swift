@@ -156,7 +156,7 @@ final class TrainingLog: Identifiable {
     var source: TrainingLogSource
     var condition: TrainingCondition?
     @Relationship(deleteRule: .cascade) var exercises: [TrainingExercise]
-    @Transient var strengthExercises: [StrengthExerciseLog]
+    @Transient var strengthExercises: [StrengthExerciseLog] = []
     @Transient var cardio: CardioExerciseLog?
     @Transient var healthSnapshot: HealthDataSnapshot?
     var note: String?
