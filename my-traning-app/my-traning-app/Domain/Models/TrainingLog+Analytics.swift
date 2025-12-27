@@ -73,8 +73,6 @@ enum TrainingLogAnalytics {
     }
 
     private static func startOfWeek(for date: Date, calendar: Calendar) -> Date? {
-        var calendar = calendar
-        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? calendar.timeZone
         return calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: date))
     }
 }

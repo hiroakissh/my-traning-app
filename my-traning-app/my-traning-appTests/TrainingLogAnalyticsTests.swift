@@ -55,6 +55,23 @@ final class TrainingLogAnalyticsTests: XCTestCase {
         XCTAssertEqual(secondWeek.dailySummaries.count, 1)
     }
 
+    func test_weeklySummaries_respectsCalendarTimeZone() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.firstWeekday = 2 // Monday
+        calendar.timeZone = TimeZone(identifier: "Asia/Tokyo")!
+
+        let date = try XCTUnwrap(calendar.date(from: DateComponents(timeZone: calendar.timeZone, year: 2024, month: 1, day: 1, hour: 0, minute: 30)))
+        let log = TrainingLog(date: date, sessionDurationSec: 600, purpose: .refresh, source: .manual, exercises: [])
+
+        let weekly = TrainingLogAnalytics.weeklySummaries(from: [log], calendar: calendar)
+        XCTAssertEqual(weekly.count, 1)
+
+        let weekStart = try XCTUnwrap(weekly.first?.weekStart)
+        let expectedWeekStart = try XCTUnwrap(calendar.date(from: DateComponents(timeZone: calendar.timeZone, year: 2024, month: 1, day: 1)))
+
+        XCTAssertTrue(calendar.isDate(weekStart, inSameDayAs: expectedWeekStart))
+    }
+
     // MARK: - Helpers
 
     private func makeLog(dateComponents: DateComponents, sessionDurationSec: Int, exercises: [TrainingExercise]) -> TrainingLog {
