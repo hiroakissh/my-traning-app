@@ -1,11 +1,6 @@
 //
-//  my_traning_appApp.swift
-//  my-traning-app
-//
-//  Created by HiroakiSaito on 2025/08/31.
-//
-
 import SwiftUI
+import SwiftData
 
 @main
 struct my_traning_appApp: App {
@@ -13,5 +8,6 @@ struct my_traning_appApp: App {
         WindowGroup {
             MainView()
         }
+        .modelContainer(for: [TrainingLog.self, TrainingCondition.self, TrainingExercise.self, TrainingSet.self])
     }
 }

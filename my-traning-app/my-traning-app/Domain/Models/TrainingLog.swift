@@ -9,6 +9,21 @@ enum TrainingPurpose: String, Codable, CaseIterable {
     case diet
     case tune
     case other
+
+    var displayName: String {
+        switch self {
+        case .refresh:
+            return "リフレッシュ"
+        case .hypertrophy:
+            return "筋肥大"
+        case .diet:
+            return "減量"
+        case .tune:
+            return "調整"
+        case .other:
+            return "その他"
+        }
+    }
 }
 
 enum ExerciseCategory: String, Codable, CaseIterable {

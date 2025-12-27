@@ -127,6 +127,13 @@
 - category = cardio: `durationSec`を基本入力。`weightKg`/`reps`はnullで問題なし。ペース・距離は別フィールド検討時に追加。
 - mobility/other: `durationSec`を基本入力とし、必要に応じて`setNote`で補足。
 
+### タイマー起点の保存ルール
+
+- 記録開始時点の時刻を`startTime`に保持し、終了操作時点を`endTime`に設定する。
+- 経過時間を秒単位でカウントし、`sessionDurationSec`へ保存する（`source=timer`）。
+- 目標タイプ別の最小条件（筋肥大/調整=メニュー2件以上、減量=600秒以上、リフレッシュ=180秒以上、その他=メニュー1件以上）を満たした場合のみ保存する。
+- メニュー選択のみでセット詳細が未入力の場合、`TrainingExercise`は`bodyPart=.other`、`category=.strength`、`sets=[]`で作成する。
+
 
 ### V1でUIから入力させる項目
 
