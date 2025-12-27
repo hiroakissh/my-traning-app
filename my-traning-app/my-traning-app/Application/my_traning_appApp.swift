@@ -1,19 +1,32 @@
 //
-//  my_traning_appApp.swift
-//  my-traning-app
-//
-//  Created by HiroakiSaito on 2025/08/31.
-//
-
 import SwiftUI
+import SwiftData
 
 @main
 struct my_traning_appApp: App {
+    private let sharedModelContainer: ModelContainer = {
+        let schema = Schema([
+            TrainingLog.self,
+            TrainingExercise.self,
+            TrainingSet.self,
+            TrainingCondition.self,
+            ActivePlan.self
+        ])
+
+        let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: isRunningTests)
+
+        do {
+            return try ModelContainer(for: schema, configurations: configuration)
+        } catch {
+            fatalError("Failed to create ModelContainer: \(error)")
+        }
+    }()
+
     var body: some Scene {
         WindowGroup {
             MainView()
-                .tint(AppColors.primary)
-                .preferredColorScheme(.dark)
         }
+        .modelContainer(sharedModelContainer)
     }
 }

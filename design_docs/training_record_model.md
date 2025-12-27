@@ -113,6 +113,14 @@
 - nullは「記録していない」を意味し、重量・時間で0は使用しない。自重は`isBodyweight=true`で表現し、`weightKg`はnullとする。
 - 同期・エクスポートを見据え、TrainingExercise/TrainingSetにもUUIDを必須で付与し安定同一性を担保する。
 
+## 履歴フィルタリングに必要な派生情報
+
+- **カテゴリ集合:** `TrainingExercise.category` をユニーク化し、`ExerciseCategory` のフィルタに利用する。
+- **部位集合:** `TrainingExercise.bodyPart` をユニーク化し、履歴リストの概要表示に利用する。
+- **セット合計:** `TrainingExercise.sets` を平坦化した件数を概要に表示し、運動量の目安とする。
+- **検索対象:** 種目名リスト、`TrainingLog.note`、目的（`TrainingPurpose`）表示名を連結した文字列に対して部分一致検索を行う。
+- **日付判定:** カレンダー同期のため、`Calendar.isDate(inSameDayAs:)` で日付フィルタリングする。
+
 ### LogSource (Enum)
 
 | コード値 | 用途 |
@@ -126,6 +134,13 @@
 - category = strength: `weightKg`と`reps`を基本入力。`durationSec`は原則使用しない。フォーム崩れ/ウォームアップは`isWarmup=true`で記録。
 - category = cardio: `durationSec`を基本入力。`weightKg`/`reps`はnullで問題なし。ペース・距離は別フィールド検討時に追加。
 - mobility/other: `durationSec`を基本入力とし、必要に応じて`setNote`で補足。
+
+### タイマー起点の保存ルール
+
+- 記録開始時点の時刻を`startTime`に保持し、終了操作時点を`endTime`に設定する。
+- 経過時間を秒単位でカウントし、`sessionDurationSec`へ保存する（`source=timer`）。
+- 目標タイプ別の最小条件（筋肥大/調整=メニュー2件以上、減量=600秒以上、リフレッシュ=180秒以上、その他=メニュー1件以上）を満たした場合のみ保存する。
+- メニュー選択のみでセット詳細が未入力の場合、`TrainingExercise`は`bodyPart=.other`、`category=.strength`、`sets=[]`で作成する。
 
 
 ### V1でUIから入力させる項目
@@ -166,3 +181,9 @@
 | core | 体幹 |
 | fullBody | 全身 |
 | other | その他 |
+
+## HUD/分析向け集計ヘルパー
+
+- `TrainingLogAnalytics.dailySummaries(from:calendar:)` で日次サマリを生成。`totalDurationSec` と筋トレビッグ3のボリュームを代表する `totalVolumeKg` を返し、目的別セッション数 (`purposeCounts`) を含む。
+- `TrainingLogAnalytics.weeklySummaries(from:calendar:)` で週次サマリを生成。`weekStart`（週初日）をキーに日次サマリを束ね、ホーム/履歴の週次グラフに供給する。
+- ボリューム計算は`isWarmup == true`を除外し、`weightKg * reps` の積のみを合計する。時間・距離系のセットはボリューム0として扱う。
