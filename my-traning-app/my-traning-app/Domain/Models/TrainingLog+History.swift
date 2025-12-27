@@ -11,6 +11,21 @@ extension ExerciseCategory {
     }
 }
 
+extension BodyPart {
+    var displayName: String {
+        switch self {
+        case .chest: return "胸"
+        case .back: return "背中"
+        case .legs: return "脚"
+        case .shoulder: return "肩"
+        case .arms: return "腕"
+        case .core: return "体幹"
+        case .fullBody: return "全身"
+        case .other: return "その他"
+        }
+    }
+}
+
 struct TrainingHistoryItem: Identifiable, Equatable {
     let id: UUID
     let log: TrainingLog
