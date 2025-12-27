@@ -13,8 +13,12 @@ enum FoundationModelClientFactory {
 
 // 本番用のAPIクライアント
 @available(iOS 26.0, *)
-class LiveFoundationModelClient: FoundationModelClientProtocol {
-    private var session: LanguageModelSession?
+struct LiveFoundationModelClient: FoundationModelClientProtocol {
+    private final class SessionBox {
+        var session: LanguageModelSession?
+    }
+
+    private let box = SessionBox()
     private let systemModelProvider: () -> SystemLanguageModel
     private let instructions: Instructions
 
@@ -35,9 +39,29 @@ class LiveFoundationModelClient: FoundationModelClientProtocol {
         }
     }
 
-    // 長期プラン生成（今回は未実装だが、将来のためにプレースホルダーを設置）
     func generatePlan(prompt: String) async throws -> String {
-        return try await generateTodaySuggestion(prompt: prompt)
+        let session = try makeSessionIfNeeded()
+
+        let longTermPrompt = """
+        以下の情報に基づき、長期・中期・短期の3層でトレーニングプランを提案してください。
+
+        # 依頼内容
+        \(prompt)
+
+        # 出力要件
+        - 長期(3ヶ月)／中期(1ヶ月)／短期(今週)の3セクションを含める
+        - 週あたりの頻度と主なフォーカス部位を明示する
+        - ボリュームや負荷は現実的な範囲で段階的に増やす
+        - 箇条書きで簡潔に
+        """
+
+        let structuredPrompt = Prompt(longTermPrompt)
+        do {
+            let generation = try await session.respond(to: structuredPrompt)
+            return generation.content
+        } catch {
+            throw FoundationModelError.generationFailed(error)
+        }
     }
 
     private func makeSessionIfNeeded() throws -> LanguageModelSession {
@@ -48,14 +72,14 @@ class LiveFoundationModelClient: FoundationModelClientProtocol {
             throw FoundationModelError.unavailable(availabilityStatus)
         }
 
-        if session == nil {
+        if box.session == nil {
             guard model.isAvailable else {
                 throw FoundationModelError.sessionUnavailable
             }
-            session = LanguageModelSession(instructions: instructions)
+            box.session = LanguageModelSession(instructions: instructions)
         }
 
-        guard let session else {
+        guard let session = box.session else {
             throw FoundationModelError.sessionUnavailable
         }
 

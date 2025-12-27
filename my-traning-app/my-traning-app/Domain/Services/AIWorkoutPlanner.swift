@@ -6,6 +6,7 @@ class AIWorkoutPlanner: ObservableObject {
     
     // 長期プラン用
     @Published var generatedPlan: String = ""
+    @Published var planSuggestions: [PlanSuggestion] = []
     
     // 今日の提案用
     @Published var todaySuggestion: String = ""
@@ -22,6 +23,7 @@ class AIWorkoutPlanner: ObservableObject {
         isLoading = true
         errorMessage = nil
         generatedPlan = ""
+        planSuggestions = []
         
         // ユーザー情報からプロンプトを生成
         let prompt = """
@@ -40,9 +42,11 @@ class AIWorkoutPlanner: ObservableObject {
         do {
             let plan = try await foundationModelClient.generatePlan(prompt: prompt)
             self.generatedPlan = plan
+            self.planSuggestions = PlanSuggestionMapper.map(from: plan, prompt: prompt)
         } catch {
             self.errorMessage = mapError(error)
             self.generatedPlan = ""
+            self.planSuggestions = []
         }
 
         isLoading = false

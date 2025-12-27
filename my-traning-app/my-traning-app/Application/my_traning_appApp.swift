@@ -1,10 +1,4 @@
 //
-//  my_traning_appApp.swift
-//  my-traning-app
-//
-//  Created by HiroakiSaito on 2025/08/31.
-//
-
 import SwiftUI
 import SwiftData
 
@@ -13,13 +7,14 @@ struct my_traning_appApp: App {
     private let sharedModelContainer: ModelContainer = {
         let schema = Schema([
             TrainingLog.self,
-            TrainingCondition.self,
             TrainingExercise.self,
-            TrainingSet.self
+            TrainingSet.self,
+            TrainingCondition.self,
+            ActivePlan.self
         ])
 
         let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
-        let configuration = ModelConfiguration(isStoredInMemoryOnly: isRunningTests)
+        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: isRunningTests)
 
         do {
             return try ModelContainer(for: schema, configurations: configuration)

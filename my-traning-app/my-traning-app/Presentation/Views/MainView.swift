@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 struct MainView: View {
     var body: some View {
@@ -23,9 +24,21 @@ struct MainView: View {
                     Label("プラン", systemImage: "list.bullet.clipboard.fill")
                 }
         }
+        .hudBackground()
+        .tint(AppColors.primary)
     }
 }
 
 #Preview {
     MainView()
+        .modelContainer(
+            for: [
+                ActivePlan.self,
+                TrainingLog.self,
+                TrainingExercise.self,
+                TrainingSet.self,
+                TrainingCondition.self
+            ] as [any PersistentModel.Type],
+            inMemory: true
+        )
 }

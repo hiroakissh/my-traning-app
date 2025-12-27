@@ -1,24 +1,37 @@
 import Foundation
 import SwiftData
 
-// MARK: - Enums
-
-enum TrainingPurpose: String, Codable, CaseIterable {
+enum TrainingPurpose: String, CaseIterable, Codable, Equatable {
     case refresh
     case hypertrophy
     case diet
     case tune
     case other
+
+    var displayName: String {
+        switch self {
+        case .refresh:
+            return "リフレッシュ"
+        case .hypertrophy:
+            return "筋肥大"
+        case .diet:
+            return "減量"
+        case .tune:
+            return "調整"
+        case .other:
+            return "その他"
+        }
+    }
 }
 
-enum ExerciseCategory: String, Codable, CaseIterable {
-    case strength
-    case cardio
-    case mobility
-    case other
+enum TrainingLogSource: String, CaseIterable, Codable, Equatable {
+    case timer
+    case manual
+    case imported
+    case unknown
 }
 
-enum BodyPart: String, Codable, CaseIterable {
+enum BodyPart: String, CaseIterable, Codable, Equatable {
     case chest
     case back
     case legs
@@ -27,128 +40,49 @@ enum BodyPart: String, Codable, CaseIterable {
     case core
     case fullBody
     case other
-
-    var displayName: String {
-        switch self {
-        case .chest: return "胸"
-        case .back: return "背中"
-        case .legs: return "脚"
-        case .shoulder: return "肩"
-        case .arms: return "腕"
-        case .core: return "体幹"
-        case .fullBody: return "全身"
-        case .other: return "その他"
-        }
-    }
 }
 
-enum LogSource: String, Codable, CaseIterable {
-    case timer
-    case manual
-    case imported
+enum ExerciseCategory: String, CaseIterable, Codable, Equatable {
+    case strength
+    case cardio
+    case mobility
+    case other
 }
-
-// MARK: - Models
 
 @Model
-final class TrainingLog {
+final class TrainingCondition: Identifiable {
     @Attribute(.unique) var id: UUID
-    var date: Date
-    var startTime: Date?
-    var endTime: Date?
-    var sessionDurationSec: Int
-    var purpose: TrainingPurpose
-    var source: LogSource
-    @Relationship(deleteRule: .cascade) var condition: TrainingCondition?
-    @Relationship(deleteRule: .cascade) var exercises: [TrainingExercise]
-    var note: String?
-
-    init(
-        id: UUID = UUID(),
-        date: Date,
-        startTime: Date? = nil,
-        endTime: Date? = nil,
-        sessionDurationSec: Int,
-        purpose: TrainingPurpose,
-        source: LogSource,
-        condition: TrainingCondition? = nil,
-        exercises: [TrainingExercise] = [],
-        note: String? = nil
-    ) {
-        self.id = id
-        self.date = date
-        self.startTime = startTime
-        self.endTime = endTime
-        self.sessionDurationSec = sessionDurationSec
-        self.purpose = purpose
-        self.source = source
-        self.condition = condition
-        self.exercises = exercises
-        self.note = note
-    }
-}
-
-@Model
-final class TrainingCondition {
-    var overallCondition: Int
     var sleepHours: Double?
     var sleepQuality: Int?
     var fatigueLevel: Int?
     var mood: Int?
     var soreness: Int?
     var conditionNote: String?
-
-    @Relationship(inverse: \TrainingLog.condition) var log: TrainingLog?
+    var overallCondition: Int?
 
     init(
-        overallCondition: Int,
+        id: UUID = UUID(),
         sleepHours: Double? = nil,
         sleepQuality: Int? = nil,
         fatigueLevel: Int? = nil,
         mood: Int? = nil,
         soreness: Int? = nil,
-        conditionNote: String? = nil
+        conditionNote: String? = nil,
+        overallCondition: Int? = nil
     ) {
-        self.overallCondition = overallCondition
+        self.id = id
         self.sleepHours = sleepHours
         self.sleepQuality = sleepQuality
         self.fatigueLevel = fatigueLevel
         self.mood = mood
         self.soreness = soreness
         self.conditionNote = conditionNote
+        self.overallCondition = overallCondition
     }
 }
 
 @Model
-final class TrainingExercise {
-    @Attribute(.unique) var id: UUID
-    var name: String
-    var bodyPart: BodyPart
-    var category: ExerciseCategory
-    @Relationship(deleteRule: .cascade) var sets: [TrainingSet]
-    var note: String?
-
-    @Relationship(inverse: \TrainingLog.exercises) var log: TrainingLog?
-
-    init(
-        id: UUID = UUID(),
-        name: String,
-        bodyPart: BodyPart = .other,
-        category: ExerciseCategory = .strength,
-        sets: [TrainingSet] = [],
-        note: String? = nil
-    ) {
-        self.id = id
-        self.name = name
-        self.bodyPart = bodyPart
-        self.category = category
-        self.sets = sets
-        self.note = note
-    }
-}
-
-@Model
-final class TrainingSet {
+final class TrainingSet: Identifiable {
     @Attribute(.unique) var id: UUID
     var order: Int
     var weightKg: Double?
@@ -159,8 +93,6 @@ final class TrainingSet {
     var setNote: String?
     var isWarmup: Bool
     var isBodyweight: Bool
-
-    @Relationship(inverse: \TrainingExercise.sets) var exercise: TrainingExercise?
 
     init(
         id: UUID = UUID(),
@@ -184,5 +116,235 @@ final class TrainingSet {
         self.setNote = setNote
         self.isWarmup = isWarmup
         self.isBodyweight = isBodyweight
+    }
+}
+
+@Model
+final class TrainingExercise: Identifiable {
+    @Attribute(.unique) var id: UUID
+    var name: String
+    var bodyPart: BodyPart
+    var category: ExerciseCategory
+    @Relationship(deleteRule: .cascade) var sets: [TrainingSet]
+    var note: String?
+
+    init(
+        id: UUID = UUID(),
+        name: String,
+        bodyPart: BodyPart,
+        category: ExerciseCategory = .strength,
+        sets: [TrainingSet] = [],
+        note: String? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.bodyPart = bodyPart
+        self.category = category
+        self.sets = sets
+        self.note = note
+    }
+}
+
+@Model
+final class TrainingLog: Identifiable {
+    @Attribute(.unique) var id: UUID
+    var date: Date
+    var startedAt: Date?
+    var endedAt: Date?
+    var sessionDurationSec: Int
+    var purpose: TrainingPurpose
+    var source: TrainingLogSource
+    var condition: TrainingCondition?
+    @Relationship(deleteRule: .cascade) var exercises: [TrainingExercise]
+    @Transient var strengthExercises: [StrengthExerciseLog] = []
+    @Transient var cardio: CardioExerciseLog?
+    @Transient var healthSnapshot: HealthDataSnapshot?
+    var note: String?
+
+    // エイリアス（設計ドキュメントのフィールド名に合わせる）
+    @Transient
+    var startTime: Date? {
+        get { startedAt }
+        set { startedAt = newValue }
+    }
+
+    @Transient
+    var endTime: Date? {
+        get { endedAt }
+        set { endedAt = newValue }
+    }
+
+    init(
+        id: UUID = UUID(),
+        date: Date,
+        startedAt: Date? = nil,
+        endedAt: Date? = nil,
+        sessionDurationSec: Int,
+        purpose: TrainingPurpose,
+        source: TrainingLogSource,
+        condition: TrainingCondition? = nil,
+        exercises: [TrainingExercise] = [],
+        strengthExercises: [StrengthExerciseLog] = [],
+        cardio: CardioExerciseLog? = nil,
+        healthSnapshot: HealthDataSnapshot? = nil,
+        note: String? = nil
+    ) {
+        self.id = id
+        self.date = date
+        self.startedAt = startedAt
+        self.endedAt = endedAt
+        self.sessionDurationSec = sessionDurationSec
+        self.purpose = purpose
+        self.source = source
+        self.condition = condition
+        self.exercises = exercises
+        self.strengthExercises = strengthExercises
+        self.cardio = cardio
+        self.healthSnapshot = healthSnapshot
+        self.note = note
+    }
+}
+
+struct StrengthExerciseLog: Identifiable, Equatable {
+    let id: UUID
+    var name: String
+    var bodyPart: BodyPart
+    var category: ExerciseCategory
+    var sets: [StrengthSetLog]
+    var note: String?
+
+    init(
+        id: UUID = UUID(),
+        name: String,
+        bodyPart: BodyPart = .other,
+        category: ExerciseCategory = .strength,
+        sets: [StrengthSetLog] = [],
+        note: String? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.bodyPart = bodyPart
+        self.category = category
+        self.sets = sets
+        self.note = note
+    }
+}
+
+struct StrengthSetLog: Identifiable, Equatable {
+    let id: UUID
+    var weight: Double?
+    var repetitions: Int?
+    var durationSec: Int?
+    var rpe: Double?
+    var restSec: Int?
+    var setNote: String?
+    var isWarmup: Bool
+    var isBodyweight: Bool
+
+    init(
+        id: UUID = UUID(),
+        weight: Double? = nil,
+        repetitions: Int? = nil,
+        durationSec: Int? = nil,
+        rpe: Double? = nil,
+        restSec: Int? = nil,
+        setNote: String? = nil,
+        isWarmup: Bool = false,
+        isBodyweight: Bool = false
+    ) {
+        self.id = id
+        self.weight = weight
+        self.repetitions = repetitions
+        self.durationSec = durationSec
+        self.rpe = rpe
+        self.restSec = restSec
+        self.setNote = setNote
+        self.isWarmup = isWarmup
+        self.isBodyweight = isBodyweight
+    }
+}
+
+struct CardioExerciseLog: Identifiable, Equatable {
+    let id: UUID
+    var name: String
+    var category: ExerciseCategory
+    var distanceInKilometers: Double
+    var durationInSeconds: TimeInterval
+    var pace: Double
+    var note: String?
+
+    init(
+        id: UUID = UUID(),
+        name: String = "Cardio",
+        category: ExerciseCategory = .cardio,
+        distanceInKilometers: Double,
+        durationInSeconds: TimeInterval,
+        pace: Double,
+        note: String? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.category = category
+        self.distanceInKilometers = distanceInKilometers
+        self.durationInSeconds = durationInSeconds
+        self.pace = pace
+        self.note = note
+    }
+}
+
+struct CardioMetrics: Equatable {
+    var distanceInKilometers: Double
+    var durationInSeconds: TimeInterval
+
+    var pacePerKilometer: Double {
+        guard distanceInKilometers > 0 else { return 0 }
+        return durationInSeconds / distanceInKilometers
+    }
+
+    var formattedPace: String {
+        let totalSeconds = Int(pacePerKilometer.rounded())
+        let minutes = totalSeconds / 60
+        let seconds = totalSeconds % 60
+        return String(format: "%d:%02d /km", minutes, seconds)
+    }
+}
+
+struct HealthDataSnapshot: Equatable {
+    var start: Date
+    var end: Date
+    var averageHeartRate: Double?
+    var restingHeartRate: Double?
+    var activeEnergyBurned: Double?
+    var basalEnergyBurned: Double?
+    var distanceWalkingRunning: Double?
+    var stepCount: Int?
+    var vo2Max: Double?
+
+    var totalEnergyBurned: Double? {
+        guard let active = activeEnergyBurned else { return nil }
+        if let basal = basalEnergyBurned {
+            return active + basal
+        }
+        return active
+    }
+
+    var availableMetrics: [String: String] {
+        var metrics: [String: String] = [:]
+        if let averageHeartRate {
+            metrics["平均心拍数"] = "\(Int(averageHeartRate)) bpm"
+        }
+        if let totalEnergy = totalEnergyBurned {
+            metrics["消費カロリー"] = "\(Int(totalEnergy.rounded())) kcal"
+        }
+        if let stepCount {
+            metrics["歩数"] = "\(stepCount) steps"
+        }
+        if let distanceWalkingRunning {
+            metrics["距離"] = String(format: "%.1f km", distanceWalkingRunning)
+        }
+        if let vo2Max {
+            metrics["VO2Max"] = String(format: "%.1f mL/kg/min", vo2Max)
+        }
+        return metrics
     }
 }

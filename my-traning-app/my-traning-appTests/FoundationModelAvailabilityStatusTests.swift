@@ -5,6 +5,14 @@ import FoundationModels
 @available(iOS 26.0, *)
 final class FoundationModelAvailabilityStatusTests: XCTestCase {
 
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+
+        if #unavailable(iOS 26.0) {
+            throw XCTSkip("FoundationModels is only available on iOS 26.0+.")
+        }
+    }
+
     func test_initFromAvailability_deviceNotEligible() {
         let status = FoundationModelAvailabilityStatus(from: .unavailable(.deviceNotEligible))
         XCTAssertEqual(status, .deviceNotEligible)
