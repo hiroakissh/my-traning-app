@@ -5,14 +5,14 @@ final class TrainingLogAnalyticsTests: XCTestCase {
 
     func test_dailySummaries_groupByDateAndCalculateVolume() throws {
         let calendar = Calendar(identifier: .gregorian)
-        let log1 = makeLog(dateComponents: DateComponents(year: 2024, month: 1, day: 1), sessionDurationSec: 1800, exercises: [
+        let log1 = makeLog(dateComponents: DateComponents(year: 2024, month: 1, day: 1), sessionDurationSec: 1800, purpose: .refresh, exercises: [
             makeExercise(name: "Bench", sets: [
                 makeSet(order: 1, weightKg: 60, reps: 10),
                 makeSet(order: 2, weightKg: 60, reps: 8, isWarmup: true) // 除外
             ])
         ])
 
-        let log2 = makeLog(dateComponents: DateComponents(year: 2024, month: 1, day: 1), sessionDurationSec: 1200, exercises: [
+        let log2 = makeLog(dateComponents: DateComponents(year: 2024, month: 1, day: 1), sessionDurationSec: 1200, purpose: .hypertrophy, exercises: [
             makeExercise(name: "Run", category: .cardio, sets: [
                 makeSet(order: 1, durationSec: 900)
             ])
@@ -74,14 +74,19 @@ final class TrainingLogAnalyticsTests: XCTestCase {
 
     // MARK: - Helpers
 
-    private func makeLog(dateComponents: DateComponents, sessionDurationSec: Int, exercises: [TrainingExercise]) -> TrainingLog {
+    private func makeLog(
+        dateComponents: DateComponents,
+        sessionDurationSec: Int,
+        purpose: TrainingPurpose = .refresh,
+        exercises: [TrainingExercise]
+    ) -> TrainingLog {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
         let date = calendar.date(from: dateComponents)!
         return TrainingLog(
             date: date,
             sessionDurationSec: sessionDurationSec,
-            purpose: .refresh,
+            purpose: purpose,
             source: .manual,
             exercises: exercises
         )
