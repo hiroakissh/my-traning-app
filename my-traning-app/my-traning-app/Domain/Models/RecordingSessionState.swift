@@ -67,11 +67,6 @@ struct RecordingSessionState: Equatable, Codable {
         return clampedProgress(current: current / target)
     }
 
-    private func progressRate(current: TimeInterval, target: TimeInterval?) -> Double? {
-        guard let target, target > 0 else { return nil }
-        return clampedProgress(current: current / target)
-    }
-
     private func clampedProgress(current: Double) -> Double {
         min(max(current, 0), 1)
     }
