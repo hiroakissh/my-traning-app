@@ -107,4 +107,30 @@ final class RecordingSessionLogicTests: XCTestCase {
         XCTAssertEqual(log.exercises.first?.bodyPart, .other)
         XCTAssertTrue(log.exercises.first?.sets.isEmpty ?? false)
     }
+
+    func test_logBuilderUsesActualFinishTimeWhenPaused() {
+        var timerState = RecordingTimerState()
+        let start = Date(timeIntervalSince1970: 1_700_100_000) // 2023-11-14T06:00:00Z 相当
+
+        timerState.start(now: start)
+        timerState.tick(now: start.addingTimeInterval(300)) // 5分稼働
+        timerState.pause(now: start.addingTimeInterval(300))
+
+        // ここで10分間停止していたと仮定（経過時間に加算しない）
+        timerState.resume(now: start.addingTimeInterval(900))
+        timerState.tick(now: start.addingTimeInterval(1200)) // 再開後5分稼働
+        timerState.stop(now: start.addingTimeInterval(1200)) // 実際の終了はスタートから20分後
+
+        let builder = RecordingSessionLogBuilder()
+        let log = builder.makeLog(
+            purpose: .refresh,
+            selectedMenus: [],
+            timerState: timerState,
+            date: start
+        )
+
+        XCTAssertEqual(log.sessionDurationSec, 600) // 稼働時間10分のみをカウント
+        XCTAssertEqual(log.startTime, start)
+        XCTAssertEqual(log.endTime, start.addingTimeInterval(1200)) // 実際の終了時刻を保持
+    }
 }

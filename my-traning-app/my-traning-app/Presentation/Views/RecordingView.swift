@@ -269,20 +269,32 @@ struct RecordingView: View {
     }
 
     private func handleSave() {
-        let validation = finishValidation
+        var finalizedTimerState = timerState
+        finalizedTimerState.stop(now: Date())
+
+        let validation = validator.validateForFinish(
+            purpose: selectedPurpose,
+            selectedMenuCount: selectedMenuItems.count,
+            elapsedSeconds: finalizedTimerState.elapsedSeconds,
+            hasStarted: finalizedTimerState.hasStarted
+        )
+
         guard validation.isValid, let purpose = selectedPurpose else {
             statusKind = .error
             statusMessage = validation.message
+            timerState = finalizedTimerState
             return
         }
+
+        timerState = finalizedTimerState
 
         isSaving = true
         do {
             let log = logBuilder.makeLog(
                 purpose: purpose,
                 selectedMenus: Array(selectedMenuItems),
-                timerState: timerState,
-                date: timerState.startTime ?? Date()
+                timerState: finalizedTimerState,
+                date: finalizedTimerState.startTime ?? Date()
             )
             modelContext.insert(log)
             try modelContext.save()
