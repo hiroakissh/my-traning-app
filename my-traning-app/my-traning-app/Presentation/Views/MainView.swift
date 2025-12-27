@@ -28,4 +28,5 @@ struct MainView: View {
 
 #Preview {
     MainView()
+        .modelContainer(for: ActivePlan.self, inMemory: true)
 }
