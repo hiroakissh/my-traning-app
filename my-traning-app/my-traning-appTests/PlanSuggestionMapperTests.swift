@@ -36,4 +36,18 @@ final class PlanSuggestionMapperTests: XCTestCase {
         XCTAssertEqual(result.first?.horizon, .general)
         XCTAssertEqual(result.first?.detail, response)
     }
+
+    func test_map_ignoresHeadingsAboveH3() {
+        let response = """
+        # タイトル
+        ## 新しいトレーニングプラン
+        ### 長期プラン
+        - 内容
+        """
+
+        let result = PlanSuggestionMapper.map(from: response, prompt: "prompt")
+
+        XCTAssertEqual(result.count, 1)
+        XCTAssertEqual(result.first?.title, "長期プラン")
+    }
 }

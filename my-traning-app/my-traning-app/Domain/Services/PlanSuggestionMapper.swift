@@ -32,7 +32,10 @@ enum PlanSuggestionMapper {
 
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.hasPrefix("###") {
+            if trimmed.hasPrefix("#") {
+                let headingLevel = trimmed.prefix { $0 == "#" }.count
+                guard headingLevel >= 3 else { continue }
+
                 if let title = currentTitle {
                     sections.append((title, currentBody))
                 } else if !currentBody.isEmpty {
@@ -40,8 +43,6 @@ enum PlanSuggestionMapper {
                 }
                 currentTitle = trimmed.replacingOccurrences(of: "^#+\\s*", with: "", options: .regularExpression)
                 currentBody = []
-            } else if trimmed.hasPrefix("##") && currentTitle == nil && currentBody.isEmpty {
-                currentTitle = trimmed.replacingOccurrences(of: "^#+\\s*", with: "", options: .regularExpression)
             } else if !trimmed.isEmpty {
                 currentBody.append(trimmed)
             }
