@@ -5,7 +5,7 @@ struct RecordingValidationResult: Equatable {
     let message: String?
 }
 
-private struct RecordingSessionValidationRule {
+struct RecordingSessionValidationRule {
     let minimumMenuCount: Int
     let minimumDuration: Int
 }
