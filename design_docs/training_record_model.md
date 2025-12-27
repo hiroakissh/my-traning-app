@@ -113,6 +113,14 @@
 - nullは「記録していない」を意味し、重量・時間で0は使用しない。自重は`isBodyweight=true`で表現し、`weightKg`はnullとする。
 - 同期・エクスポートを見据え、TrainingExercise/TrainingSetにもUUIDを必須で付与し安定同一性を担保する。
 
+## 履歴フィルタリングに必要な派生情報
+
+- **カテゴリ集合:** `TrainingExercise.category` をユニーク化し、`ExerciseCategory` のフィルタに利用する。
+- **部位集合:** `TrainingExercise.bodyPart` をユニーク化し、履歴リストの概要表示に利用する。
+- **セット合計:** `TrainingExercise.sets` を平坦化した件数を概要に表示し、運動量の目安とする。
+- **検索対象:** 種目名リスト、`TrainingLog.note`、目的（`TrainingPurpose`）表示名を連結した文字列に対して部分一致検索を行う。
+- **日付判定:** カレンダー同期のため、`Calendar.isDate(inSameDayAs:)` で日付フィルタリングする。
+
 ### LogSource (Enum)
 
 | コード値 | 用途 |

@@ -6,8 +6,11 @@ class MockFoundationModelClientForTest: FoundationModelClientProtocol {
     var planResponse = "Test Plan"
     var suggestionResponse = "Test Suggestion"
     var errorToThrow: Error?
+    var lastPlanPrompt: String?
+    var lastSuggestionPrompt: String?
 
     func generatePlan(prompt: String) async throws -> String {
+        lastPlanPrompt = prompt
         if let errorToThrow {
             throw errorToThrow
         }
@@ -15,6 +18,7 @@ class MockFoundationModelClientForTest: FoundationModelClientProtocol {
     }
 
     func generateTodaySuggestion(prompt: String) async throws -> String {
+        lastSuggestionPrompt = prompt
         if let errorToThrow {
             throw errorToThrow
         }
@@ -55,6 +59,8 @@ final class AIWorkoutPlannerTests: XCTestCase {
         XCTAssertFalse(planner.isLoading, "isLoading should be false after completion")
         XCTAssertNil(planner.errorMessage, "errorMessage should be nil on success")
         XCTAssertEqual(planner.generatedPlan, expectedPlan, "generatedPlan should match the mock response")
+        XCTAssertEqual(planner.planSuggestions.count, 1)
+        XCTAssertEqual(planner.planSuggestions.first?.detail, expectedPlan)
     }
 
     func test_createPlan_failure() async {
@@ -68,6 +74,7 @@ final class AIWorkoutPlannerTests: XCTestCase {
         XCTAssertFalse(planner.isLoading, "isLoading should be false after completion")
         XCTAssertNotNil(planner.errorMessage, "errorMessage should not be nil on failure")
         XCTAssertTrue(planner.generatedPlan.isEmpty, "generatedPlan should be empty on failure")
+        XCTAssertTrue(planner.planSuggestions.isEmpty, "planSuggestions should be cleared on failure")
     }
 
     func test_createPlan_unavailableUnknownReasonIncludesDetails() async {
@@ -80,6 +87,7 @@ final class AIWorkoutPlannerTests: XCTestCase {
         // Then
         XCTAssertEqual(planner.errorMessage, "AIモデルが現在利用できません。時間を置いて再度お試しください。（詳細: Maintenance)")
         XCTAssertTrue(planner.generatedPlan.isEmpty)
+        XCTAssertTrue(planner.planSuggestions.isEmpty)
     }
 
     func test_createPlan_unexpectedNSErrorShowsFallbackMessage() async {
@@ -92,6 +100,7 @@ final class AIWorkoutPlannerTests: XCTestCase {
         // Then
         XCTAssertEqual(planner.errorMessage, "想定外のエラーが発生しました。（コード: 404)")
         XCTAssertTrue(planner.generatedPlan.isEmpty)
+        XCTAssertTrue(planner.planSuggestions.isEmpty)
     }
 
     // MARK: - suggestTodayWorkout Tests
@@ -108,6 +117,17 @@ final class AIWorkoutPlannerTests: XCTestCase {
         XCTAssertFalse(planner.isLoading, "isLoading should be false after completion")
         XCTAssertNil(planner.errorMessage, "errorMessage should be nil on success")
         XCTAssertEqual(planner.todaySuggestion, expectedSuggestion, "todaySuggestion should match the mock response")
+    }
+
+    func test_createPlan_buildsPromptWithUserProfile() async {
+        await planner.createPlan(userProfile: dummyProfile, goal: "筋力アップ")
+
+        let prompt = mockClient.lastPlanPrompt ?? ""
+        XCTAssertTrue(prompt.contains("年齢: 30歳"))
+        XCTAssertTrue(prompt.contains("性別: 男性"))
+        XCTAssertTrue(prompt.contains("身長: 175cm"))
+        XCTAssertTrue(prompt.contains("体重: 70kg"))
+        XCTAssertTrue(prompt.contains("筋力アップ"))
     }
 
     func test_suggestTodayWorkout_failure() async {

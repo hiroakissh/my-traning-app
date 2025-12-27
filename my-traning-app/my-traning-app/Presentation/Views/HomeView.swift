@@ -1,8 +1,10 @@
 import SwiftUI
+import SwiftData
 
 struct HomeView: View {
     @StateObject private var planner = AIWorkoutPlanner()
     @State private var aiQuery: String = ""
+    @Query(sort: \ActivePlan.adoptedAt, order: .reverse) private var savedPlans: [ActivePlan]
     
     // AIへの質問をトリガーするためのState
     @State private var triggerSuggestion = false
@@ -11,6 +13,35 @@ struct HomeView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
+                    // 0. アクティブプラン概要
+                    Section(header: Text("アクティブプラン").font(.title2).bold()) {
+                        if let activePlan = savedPlans.first {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(activePlan.title)
+                                    .font(.headline)
+                                Text(activePlan.summary)
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(3)
+                                Text(activePlan.detail)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(4)
+                            }
+                            .padding()
+                            .background(Color(.secondarySystemGroupedBackground))
+                            .cornerRadius(12)
+                        } else {
+                            Text("まだプランが設定されていません。プランタブからAIに再提案を依頼してください。")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .padding()
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(Color(.secondarySystemGroupedBackground))
+                                .cornerRadius(12)
+                        }
+                    }
+
                     // 1. 今日のトレーニングプラン
                     Section(header: Text("今日のトレーニングプラン").font(.title2).bold()) {
                         VStack(alignment: .leading, spacing: 12) {
@@ -122,4 +153,5 @@ struct HomeView: View {
 
 #Preview {
     HomeView()
+        .modelContainer(for: ActivePlan.self, inMemory: true)
 }
