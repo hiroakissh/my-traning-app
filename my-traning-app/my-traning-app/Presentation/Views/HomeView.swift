@@ -24,6 +24,7 @@ struct HomeView: View {
                 .padding(.horizontal, AppLayout.grid * 2)
                 .padding(.vertical, AppLayout.grid * 2)
             }
+            .scrollContentBackground(.hidden)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {

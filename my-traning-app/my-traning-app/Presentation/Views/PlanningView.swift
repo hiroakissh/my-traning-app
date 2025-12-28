@@ -14,19 +14,30 @@ struct PlanningView: View {
     @State private var goalText: String = ""
     @State private var selectedPurpose: TrainingPurpose = .hypertrophy
 
+    private var activePlan: ActivePlan? { savedPlans.first }
+
     var body: some View {
         NavigationStack {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: AppLayout.grid * 2) {
                     header
+
+                    if let activePlan {
+                        activePlanHero(plan: activePlan)
+                    }
+
                     goalInput
                     purposeChips
                     suggestedSection
-                    activePlanSection
+
+                    if activePlan == nil {
+                        activePlanSection
+                    }
                 }
                 .padding(.horizontal, AppLayout.grid * 2)
                 .padding(.vertical, AppLayout.grid * 2.5)
             }
+            .scrollContentBackground(.hidden)
             .navigationTitle("")
             .navigationBarHidden(true)
             .toolbar {
@@ -64,10 +75,7 @@ struct PlanningView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: AppLayout.grid * 0.5) {
-            Text(Date().formatted(.dateTime.hour().minute()))
-                .font(AppTypography.label(13, weight: .semibold))
-                .foregroundColor(AppColors.secondary)
-            Text("AIプラン生成")
+            Text(activePlan == nil ? "AIプラン生成" : "現在のプラン")
                 .font(AppTypography.title(26))
                 .foregroundColor(AppColors.textPrimary)
         }
@@ -128,11 +136,11 @@ struct PlanningView: View {
     private var suggestedSection: some View {
         VStack(alignment: .leading, spacing: AppLayout.grid * 1.5) {
             HStack {
-            Text("提案されたプラン")
-                .font(AppTypography.body(17, weight: .semibold))
-                .foregroundColor(AppColors.textPrimary)
-            Spacer()
-            if planner.planSuggestions.isEmpty == false {
+                Text("提案されたプラン")
+                    .font(AppTypography.body(17, weight: .semibold))
+                    .foregroundColor(AppColors.textPrimary)
+                Spacer()
+                if planner.planSuggestions.isEmpty == false {
                     Text("\(planner.planSuggestions.count)件の新規提案")
                         .font(AppTypography.label(12, weight: .semibold))
                         .foregroundColor(AppColors.secondary)
@@ -160,15 +168,10 @@ struct PlanningView: View {
                     .foregroundColor(AppColors.textSecondary)
                     .padding(.vertical, AppLayout.grid)
             } else {
-                // 先頭の説明カードは選択不可で表示
-                if let description = planner.planSuggestions.first {
-                    descriptionCard(description)
-                }
                 VStack(spacing: AppLayout.grid * 1.5) {
                     ForEach(Array(planner.planSuggestions.enumerated()), id: \.element.id) { index, suggestion in
                         if index == 0 {
-                            // 説明カードのみ表示（選択不可）
-                            EmptyView()
+                            descriptionCard(suggestion)
                         } else {
                             suggestionCard(suggestion)
                         }
@@ -312,6 +315,85 @@ struct PlanningView: View {
         .glassCardStyle(secondary: true)
     }
 
+    private func activePlanHero(plan: ActivePlan) -> some View {
+        let progressValue = planProgressRate(for: plan)
+        let progressLabel = String(format: "%.0f%%", progressValue * 100)
+
+        return VStack(alignment: .leading, spacing: AppLayout.grid * 1.4) {
+            HStack {
+                pill(text: "ACTIVE PLAN", secondary: false)
+                Spacer()
+                pill(text: plan.horizon.displayName.uppercased(), secondary: true)
+            }
+            Text(plan.title)
+                .font(AppTypography.body(20, weight: .semibold))
+                .foregroundColor(AppColors.textPrimary)
+            Text(plan.summary)
+                .font(AppTypography.body(14))
+                .foregroundColor(AppColors.textSecondary)
+                .lineLimit(3)
+
+            VStack(alignment: .leading, spacing: AppLayout.grid * 0.6) {
+                Text("進捗状況")
+                    .font(AppTypography.label(12, weight: .semibold))
+                    .foregroundColor(AppColors.textSecondary)
+                ProgressView(value: progressValue) {
+                    Text(progressLabel)
+                        .font(AppTypography.body(14, weight: .semibold))
+                        .foregroundColor(AppColors.textPrimary)
+                }
+                .tint(AppColors.primary)
+            }
+
+            HStack(spacing: AppLayout.grid * 1.5) {
+                metricChip(title: "期間", value: horizonDurationLabel(for: plan), systemImage: "calendar")
+                metricChip(title: "採用日", value: plan.adoptedAt.formatted(date: .abbreviated, time: .omitted), systemImage: "clock")
+                metricChip(title: "進捗", value: progressLabel, systemImage: "chart.line.uptrend.xyaxis")
+            }
+
+            Text("プラン概要")
+                .font(AppTypography.body(15, weight: .semibold))
+                .foregroundColor(AppColors.textPrimary)
+            Text(plan.detail)
+                .font(AppTypography.body(14))
+                .foregroundColor(AppColors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button {
+                triggerPlanGeneration = true
+            } label: {
+                Label("AIに再提案を依頼", systemImage: "sparkles")
+                    .font(AppTypography.body(16, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(AppColors.primary)
+
+            HStack(spacing: AppLayout.grid) {
+                Button {
+                    triggerPlanGeneration = true
+                } label: {
+                    Label("他のプランを見る", systemImage: "square.grid.2x2")
+                        .font(AppTypography.body(15, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .tint(AppColors.secondary)
+
+                NavigationLink(destination: EmptyView()) {
+                    Label("プランを変更", systemImage: "square.and.pencil")
+                        .font(AppTypography.body(15, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .tint(AppColors.textSecondary)
+                .disabled(true) // プレースホルダー
+            }
+        }
+        .padding(AppLayout.grid * 2)
+        .glassCardStyle()
+    }
+
     private func adoptPlan(from suggestion: PlanSuggestion) {
         let plan = ActivePlan(
             horizon: suggestion.horizon,
@@ -366,6 +448,31 @@ struct PlanningView: View {
         }
         .padding(AppLayout.grid * 2)
         .glassCardStyle()
+    }
+
+    private func planProgressRate(for plan: ActivePlan) -> Double {
+        let durationDays = horizonDurationDays(for: plan)
+        guard durationDays > 0 else { return 0 }
+        let elapsed = Calendar.current.dateComponents([.day], from: plan.adoptedAt, to: Date()).day ?? 0
+        let rate = Double(elapsed) / Double(durationDays)
+        return min(max(rate, 0), 1)
+    }
+
+    private func horizonDurationDays(for plan: ActivePlan) -> Int {
+        switch plan.horizon {
+        case .shortTerm: return 21
+        case .midTerm: return 42
+        case .longTerm: return 90
+        case .general: return 28
+        }
+    }
+
+    private func horizonDurationLabel(for plan: ActivePlan) -> String {
+        let days = horizonDurationDays(for: plan)
+        if days % 7 == 0 {
+            return "\(days / 7)週間"
+        }
+        return "\(days)日間"
     }
 }
 
