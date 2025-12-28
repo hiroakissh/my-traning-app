@@ -56,6 +56,8 @@ struct PlanningView: View {
                     Text(persistenceError)
                 }
             }
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
         }
         .hudBackground()
     }

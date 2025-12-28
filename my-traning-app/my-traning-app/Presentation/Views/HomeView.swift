@@ -51,6 +51,8 @@ struct HomeView: View {
             .refreshable {
                 await dashboardViewModel.refreshHealthData()
             }
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
         }
         .hudBackground()
     }
