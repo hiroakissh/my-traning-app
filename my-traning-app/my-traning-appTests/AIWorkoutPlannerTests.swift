@@ -189,4 +189,61 @@ final class AIWorkoutPlannerTests: XCTestCase {
         // Then
         XCTAssertEqual(planner.errorMessage, "AIセッションを初期化できませんでした。デバイスの状態を確認してから再試行してください。")
     }
+
+    func test_suggestTodayWorkout_includesContextData() async throws {
+        // Given
+        let log = TrainingLog(
+            date: Date(),
+            sessionDurationSec: 1200,
+            purpose: .hypertrophy,
+            source: .manual,
+            exercises: [
+                TrainingExercise(
+                    name: "Bench Press",
+                    bodyPart: .chest,
+                    sets: [
+                        TrainingSet(order: 1, weightKg: 60, reps: 10, isBodyweight: false)
+                    ]
+                )
+            ]
+        )
+
+        let snapshot = HealthDataSnapshot(
+            start: Date(),
+            end: Date(),
+            averageHeartRate: 128,
+            restingHeartRate: 60,
+            activeEnergyBurned: 500,
+            basalEnergyBurned: 200,
+            distanceWalkingRunning: 5.2,
+            stepCount: 7200,
+            vo2Max: nil
+        )
+
+        let activePlan = ActivePlan(
+            horizon: .shortTerm,
+            title: "胸の日 強化",
+            summary: "ベンチプレスの重量を伸ばす短期プラン",
+            detail: "週3回のプッシュメインセッションを実施し、セット数を段階的に増やす",
+            sourcePrompt: "テスト"
+        )
+
+        let context = AIAssistantContext(
+            userQuery: "肩が張っているので軽めにしたい",
+            activePlan: activePlan,
+            recentLogs: [log],
+            healthSnapshot: snapshot,
+            dailyGoalKcal: 1650
+        )
+
+        // When
+        await planner.suggestTodayWorkout(prompt: "肩が張っているので軽めにしたい", context: context)
+
+        // Then
+        let prompt = try XCTUnwrap(mockClient.lastSuggestionPrompt)
+        XCTAssertTrue(prompt.contains("5.2 km"))
+        XCTAssertTrue(prompt.contains("平均心拍数: 128 bpm"))
+        XCTAssertTrue(prompt.contains("肩が張っているので軽めにしたい"))
+        XCTAssertTrue(prompt.contains("アクティブプラン"))
+    }
 }

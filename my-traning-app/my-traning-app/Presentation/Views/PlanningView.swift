@@ -11,37 +11,39 @@ struct PlanningView: View {
     @State private var triggerPlanGeneration = false
     @State private var persistenceError: String?
 
+    @State private var goalText: String = ""
+    @State private var selectedPurpose: TrainingPurpose = .hypertrophy
+
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: AppLayout.grid * 2) {
+                    header
+                    goalInput
+                    purposeChips
+                    suggestedSection
                     activePlanSection
-                    plannerContent
                 }
-                .padding()
+                .padding(.horizontal, AppLayout.grid * 2)
+                .padding(.vertical, AppLayout.grid * 2.5)
             }
-            .navigationTitle("プランニング")
+            .navigationTitle("")
+            .navigationBarHidden(true)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        // ボタンタップでプラン生成をトリガー
-                        triggerPlanGeneration = true
-                    }) {
-                        HStack {
-                            Image(systemName: "arrow.clockwise.circle.fill")
-                            Text("再生成")
-                        }
+                    Button(action: { triggerPlanGeneration = true }) {
+                        Image(systemName: "arrow.clockwise.circle.fill")
+                            .foregroundColor(AppColors.primary)
                     }
-                    .buttonStyle(.bordered)
-                    .disabled(planner.isLoading) // ローディング中はボタンを無効化
+                    .disabled(planner.isLoading)
                 }
             }
             // triggerPlanGenerationがtrueになったら非同期タスクを実行
             .task(id: triggerPlanGeneration) {
                 if triggerPlanGeneration {
-                    // ダミーのユーザー情報と目標でプラン生成をリクエスト
                     let dummyProfile = UserProfile(age: 30, gender: "男性", height: 175, weight: 70)
-                    await planner.createPlan(userProfile: dummyProfile, goal: "3ヶ月で筋力アップを目指す")
+                    let prompt = buildGoalPrompt()
+                    await planner.createPlan(userProfile: dummyProfile, goal: prompt)
                     
                     // トリガーをリセット
                     triggerPlanGeneration = false
@@ -55,62 +57,108 @@ struct PlanningView: View {
                 }
             }
         }
+        .hudBackground()
     }
 
-    @ViewBuilder
-    private var activePlanSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("アクティブプラン")
-                .font(.title2)
-                .bold()
+    private var header: some View {
+        VStack(alignment: .leading, spacing: AppLayout.grid * 0.5) {
+            Text(Date().formatted(.dateTime.hour().minute()))
+                .font(AppTypography.label(13, weight: .semibold))
+                .foregroundColor(AppColors.secondary)
+            Text("AIプラン生成")
+                .font(AppTypography.title(26))
+                .foregroundColor(AppColors.textPrimary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 
-            if let activePlan = savedPlans.first {
-                activePlanCard(plan: activePlan)
-            } else {
-                Text("まだプランが採用されていません。最新の提案から選択してください。")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding()
-                    .background(Color(.secondarySystemBackground))
-                    .cornerRadius(12)
+    private var goalInput: some View {
+        HudSectionCard(title: "新しい目標を設定", subtitle: nil, spacing: AppLayout.grid * 1.2) {
+            HStack(spacing: AppLayout.grid) {
+                Image(systemName: "sparkles")
+                    .foregroundColor(AppColors.primary)
+                TextField("3ヶ月でベンチプレスを100kgにしたい", text: $goalText)
+                    .foregroundColor(AppColors.textPrimary)
+                    .textInputAutocapitalization(.sentences)
+                Button(action: { triggerPlanGeneration = true }) {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 28))
+                        .foregroundColor(AppColors.primary)
+                }
+                .disabled(planner.isLoading)
             }
+            .padding(.vertical, AppLayout.grid * 1.25)
+            .padding(.horizontal, AppLayout.grid * 1.5)
+            .background(AppColors.surface2.opacity(0.9))
+            .clipShape(RoundedRectangle(cornerRadius: AppLayout.cardRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: AppLayout.cardRadius, style: .continuous)
+                    .stroke(AppColors.strokeGlow, lineWidth: 1)
+            )
+        }
+    }
+
+    private var purposeChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: AppLayout.grid) {
+                ForEach(TrainingPurpose.allCases, id: \.self) { purpose in
+                    Button(action: { selectedPurpose = purpose }) {
+                        Text(purpose.displayName)
+                            .font(AppTypography.label(13, weight: .semibold))
+                            .padding(.horizontal, AppLayout.grid * 2)
+                            .padding(.vertical, AppLayout.grid * 0.8)
+                            .background(
+                                Capsule().fill(purpose == selectedPurpose ? AppColors.primary : AppColors.surface2)
+                            )
+                            .overlay(
+                                Capsule()
+                                    .stroke(AppColors.strokeGlow, lineWidth: 1)
+                            )
+                            .foregroundColor(purpose == selectedPurpose ? AppColors.background : AppColors.textSecondary)
+                    }
+                }
+            }
+            .padding(.vertical, AppLayout.grid * 0.5)
         }
     }
 
     @ViewBuilder
-    private var plannerContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("最新の提案")
-                .font(.title2)
-                .bold()
+    private var suggestedSection: some View {
+        VStack(alignment: .leading, spacing: AppLayout.grid * 1.5) {
+            HStack {
+                Text("提案されたプラン")
+                    .font(AppTypography.body(17, weight: .semibold))
+                    .foregroundColor(AppColors.textPrimary)
+                Spacer()
+                if planner.planSuggestions.isEmpty == false {
+                    Text("\(planner.planSuggestions.count)件の新規提案")
+                        .font(AppTypography.label(12, weight: .semibold))
+                        .foregroundColor(AppColors.secondary)
+                }
+            }
 
             if planner.isLoading {
                 ProgressView("新しいプランを生成しています...")
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .tint(AppColors.primary)
             } else if let errorMessage = planner.errorMessage {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundColor(.orange)
-                        Text(errorMessage)
-                            .font(.subheadline)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding()
-                    .background(Color(.systemOrange).opacity(0.15))
-                    .cornerRadius(12)
+                HStack(alignment: .top, spacing: AppLayout.grid) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.orange)
+                    Text(errorMessage)
+                        .font(AppTypography.label())
+                        .foregroundColor(AppColors.textPrimary)
+                        .multilineTextAlignment(.leading)
                 }
+                .padding()
+                .background(AppColors.surface.opacity(0.8))
+                .clipShape(RoundedRectangle(cornerRadius: AppLayout.cardRadius, style: .continuous))
             } else if planner.planSuggestions.isEmpty {
-                Text("「再生成」ボタンを押して、新しいプランを作成してください。")
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.leading)
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(.secondarySystemBackground))
-                    .cornerRadius(12)
+                Text("目標を入力して「↑」をタップするとプランを提案します。")
+                    .font(AppTypography.label())
+                    .foregroundColor(AppColors.textSecondary)
+                    .padding(.vertical, AppLayout.grid)
             } else {
-                VStack(spacing: 12) {
+                VStack(spacing: AppLayout.grid * 1.5) {
                     ForEach(planner.planSuggestions) { suggestion in
                         suggestionCard(suggestion)
                     }
@@ -120,66 +168,116 @@ struct PlanningView: View {
     }
 
     private func suggestionCard(_ suggestion: PlanSuggestion) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(suggestion.horizon.displayName)
-                    .font(.headline)
-                Spacer()
-                Text(suggestion.createdAt.formatted(date: .omitted, time: .shortened))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+        VStack(alignment: .leading, spacing: AppLayout.grid * 1.2) {
+            HStack(spacing: AppLayout.grid) {
+                pill(text: suggestion.horizon.displayName.uppercased())
+                if Calendar.current.isDateInToday(suggestion.createdAt) {
+                    pill(text: "RECOMMENDED", secondary: true)
+                }
             }
 
             Text(suggestion.title)
-                .font(.subheadline)
-                .foregroundColor(.primary)
+                .font(AppTypography.body(18, weight: .semibold))
+                .foregroundColor(AppColors.textPrimary)
 
             Text(suggestion.detail)
-                .font(.footnote)
-                .foregroundColor(.secondary)
-                .lineLimit(6)
+                .font(AppTypography.body(14))
+                .foregroundColor(AppColors.textSecondary)
+                .lineLimit(4)
 
-            Button(action: {
-                adoptPlan(from: suggestion)
-            }) {
-                Text("このプランを採用")
+            HStack(spacing: AppLayout.grid) {
+                metricChip(title: "頻度", value: frequencyText(from: suggestion.detail) ?? "調整可", systemImage: "calendar")
+                metricChip(title: "強度", value: intensityText(from: suggestion.detail) ?? "フレキシブル", systemImage: "flame.fill")
+            }
+
+            Button(action: { adoptPlan(from: suggestion) }) {
+                Text("プランを採用 →")
+                    .font(AppTypography.body(16, weight: .semibold))
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
+            .tint(AppColors.primary)
             .disabled(planner.isLoading)
         }
+        .padding(AppLayout.grid * 2)
+        .glassCardStyle()
+    }
+
+    private func pill(text: String, secondary: Bool = false) -> some View {
+        Text(text)
+            .font(AppTypography.label(12, weight: .semibold))
+            .padding(.horizontal, AppLayout.grid * 1.5)
+            .padding(.vertical, AppLayout.grid * 0.7)
+            .background(secondary ? AppColors.surface2 : AppColors.primary)
+            .foregroundColor(secondary ? AppColors.textPrimary : AppColors.background)
+            .clipShape(Capsule())
+    }
+
+    private func metricChip(title: String, value: String, systemImage: String) -> some View {
+        VStack(alignment: .leading, spacing: AppLayout.grid * 0.4) {
+            HStack(spacing: AppLayout.grid * 0.8) {
+                Image(systemName: systemImage)
+                    .foregroundColor(AppColors.primary)
+                Text(title)
+                    .font(AppTypography.label(12, weight: .semibold))
+                    .foregroundColor(AppColors.textSecondary)
+            }
+            Text(value)
+                .font(AppTypography.body(15, weight: .semibold))
+                .foregroundColor(AppColors.textPrimary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+        .background(AppColors.surface2.opacity(0.9))
+        .clipShape(RoundedRectangle(cornerRadius: AppLayout.cardRadius, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: AppLayout.cardRadius, style: .continuous)
+                .stroke(AppColors.strokeGlow, lineWidth: 1)
+        )
+    }
+
+    @ViewBuilder
+    private var activePlanSection: some View {
+        VStack(alignment: .leading, spacing: AppLayout.grid) {
+            Text("アクティブプラン")
+                .font(AppTypography.body(17, weight: .semibold))
+                .foregroundColor(AppColors.textPrimary)
+
+            if let activePlan = savedPlans.first {
+                activePlanCard(plan: activePlan)
+            } else {
+                Text("まだプランが採用されていません。最新の提案から選択してください。")
+                    .font(AppTypography.label())
+                    .foregroundColor(AppColors.textSecondary)
+                    .padding()
+                    .glassCardStyle(secondary: true)
+            }
+        }
     }
 
     private func activePlanCard(plan: ActivePlan) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(plan.horizon.displayName)
-                    .font(.headline)
-                Spacer()
+        VStack(alignment: .leading, spacing: AppLayout.grid) {
+            HStack(spacing: AppLayout.grid) {
+                pill(text: plan.horizon.displayName.uppercased(), secondary: true)
                 Text(plan.adoptedAt.formatted(date: .abbreviated, time: .shortened))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(AppTypography.label(12))
+                    .foregroundColor(AppColors.textSecondary)
+                Spacer()
             }
             Text(plan.title)
-                .font(.subheadline)
-                .bold()
+                .font(AppTypography.body(18, weight: .semibold))
+                .foregroundColor(AppColors.textPrimary)
             Text(plan.summary)
-                .font(.footnote)
-                .foregroundColor(.secondary)
-                .lineLimit(4)
+                .font(AppTypography.label())
+                .foregroundColor(AppColors.textSecondary)
+                .lineLimit(3)
             Text(plan.detail)
-                .font(.footnote)
-                .foregroundColor(.secondary)
-                .lineLimit(6)
+                .font(AppTypography.label())
+                .foregroundColor(AppColors.textSecondary)
+                .lineLimit(5)
         }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.systemGroupedBackground))
-        .cornerRadius(12)
+        .padding(AppLayout.grid * 2)
+        .glassCardStyle(secondary: true)
     }
 
     private func adoptPlan(from suggestion: PlanSuggestion) {
@@ -196,6 +294,27 @@ struct PlanningView: View {
         } catch {
             persistenceError = error.localizedDescription
         }
+    }
+
+    private func buildGoalPrompt() -> String {
+        let trimmed = goalText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let goal = trimmed.isEmpty ? "3ヶ月で筋力アップを目指す" : trimmed
+        return "目的: \(selectedPurpose.displayName)\n目標: \(goal)"
+    }
+
+    private func frequencyText(from text: String) -> String? {
+        let pattern = "週\\s*([0-9]+)\\s*回"
+        if let range = text.range(of: pattern, options: .regularExpression) {
+            return String(text[range])
+        }
+        return nil
+    }
+
+    private func intensityText(from text: String) -> String? {
+        if text.contains("高強度") { return "高強度" }
+        if text.contains("中強度") { return "中強度" }
+        if text.contains("低強度") { return "低強度" }
+        return nil
     }
 }
 
