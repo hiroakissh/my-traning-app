@@ -128,11 +128,11 @@ struct PlanningView: View {
     private var suggestedSection: some View {
         VStack(alignment: .leading, spacing: AppLayout.grid * 1.5) {
             HStack {
-                Text("提案されたプラン")
-                    .font(AppTypography.body(17, weight: .semibold))
-                    .foregroundColor(AppColors.textPrimary)
-                Spacer()
-                if planner.planSuggestions.isEmpty == false {
+            Text("提案されたプラン")
+                .font(AppTypography.body(17, weight: .semibold))
+                .foregroundColor(AppColors.textPrimary)
+            Spacer()
+            if planner.planSuggestions.isEmpty == false {
                     Text("\(planner.planSuggestions.count)件の新規提案")
                         .font(AppTypography.label(12, weight: .semibold))
                         .foregroundColor(AppColors.secondary)
@@ -160,9 +160,18 @@ struct PlanningView: View {
                     .foregroundColor(AppColors.textSecondary)
                     .padding(.vertical, AppLayout.grid)
             } else {
+                // 先頭の説明カードは選択不可で表示
+                if let description = planner.planSuggestions.first {
+                    descriptionCard(description)
+                }
                 VStack(spacing: AppLayout.grid * 1.5) {
-                    ForEach(planner.planSuggestions) { suggestion in
-                        suggestionCard(suggestion)
+                    ForEach(Array(planner.planSuggestions.enumerated()), id: \.element.id) { index, suggestion in
+                        if index == 0 {
+                            // 説明カードのみ表示（選択不可）
+                            EmptyView()
+                        } else {
+                            suggestionCard(suggestion)
+                        }
                     }
                 }
             }
@@ -277,6 +286,27 @@ struct PlanningView: View {
                 .font(AppTypography.label())
                 .foregroundColor(AppColors.textSecondary)
                 .lineLimit(5)
+
+            HStack(spacing: AppLayout.grid) {
+                Button {
+                    triggerPlanGeneration = true
+                } label: {
+                    Label("AIに再提案を依頼", systemImage: "sparkles")
+                        .font(AppTypography.body(15, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .tint(AppColors.primary)
+
+                NavigationLink(destination: EmptyView()) {
+                    Label("プランを変更", systemImage: "square.and.pencil")
+                        .font(AppTypography.body(15, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .tint(AppColors.textSecondary)
+                .disabled(true) // 実装プレースホルダー
+            }
         }
         .padding(AppLayout.grid * 2)
         .glassCardStyle(secondary: true)
@@ -317,6 +347,25 @@ struct PlanningView: View {
         if text.contains("中強度") { return "中強度" }
         if text.contains("低強度") { return "低強度" }
         return nil
+    }
+
+    private func descriptionCard(_ suggestion: PlanSuggestion) -> some View {
+        VStack(alignment: .leading, spacing: AppLayout.grid) {
+            HStack {
+                pill(text: "ACTIVE PLAN", secondary: true)
+                Spacer()
+                pill(text: suggestion.horizon.displayName.uppercased(), secondary: true)
+            }
+            Text(suggestion.title)
+                .font(AppTypography.body(18, weight: .semibold))
+                .foregroundColor(AppColors.textPrimary)
+            Text(suggestion.detail)
+                .font(AppTypography.body(14))
+                .foregroundColor(AppColors.textSecondary)
+                .lineLimit(nil)
+        }
+        .padding(AppLayout.grid * 2)
+        .glassCardStyle()
     }
 }
 
