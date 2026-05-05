@@ -11,8 +11,21 @@ class MockFoundationModelClientForTest: FoundationModelClientProtocol {
         title: "Test Recommendation",
         summary: "Test Summary",
         reasons: ["Reason 1", "Reason 2", "Reason 3"],
-        exercises: [],
-        alternatives: [],
+        exercises: [
+            PlannedExerciseOutput(
+                name: "Test Exercise",
+                detail: "Test Detail",
+                targetSets: 2,
+                targetReps: 8,
+                weightDescription: "light",
+                estimatedMinutes: 10,
+                category: .strength
+            )
+        ],
+        alternatives: [
+            AlternativePlanOutput(title: "Short", description: "Short plan", estimatedMinutes: 10, intensity: 2),
+            AlternativePlanOutput(title: "Rest", description: "Rest plan", estimatedMinutes: 0, intensity: 1)
+        ],
         recoveryAdvice: ["Advice 1", "Advice 2"]
     )
     var errorToThrow: Error?

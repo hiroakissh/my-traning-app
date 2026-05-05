@@ -15,6 +15,10 @@ struct my_traning_appApp: App {
             DailyRecommendation.self,
             PlannedExercise.self,
             AlternativePlan.self,
+            WorkoutSession.self,
+            WorkoutSessionExercise.self,
+            PlannedSet.self,
+            ActualSet.self,
             UserGoal.self,
             WeeklyReview.self
         ])

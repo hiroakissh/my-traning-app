@@ -3,6 +3,7 @@ import Foundation
 @MainActor // UIの更新を伴う可能性があるため、メインスレッドで動作させる
 class AIWorkoutPlanner: ObservableObject {
     private let foundationModelClient: FoundationModelClientProtocol
+    private let planGenerationService: PlanGenerationService
     private let calendar: Calendar
     
     // 長期プラン用
@@ -12,6 +13,7 @@ class AIWorkoutPlanner: ObservableObject {
     // 今日の提案用
     @Published var todaySuggestion: String = ""
     @Published var dailyRecommendationOutput: DailyRecommendationOutput?
+    @Published var dailyRecommendation: DailyRecommendation?
     
     @Published var isLoading: Bool = false
     @Published var errorMessage: String? = nil
@@ -19,9 +21,17 @@ class AIWorkoutPlanner: ObservableObject {
     // DI (依存性注入) を可能にするイニシャライザ
     init(
         foundationModelClient: FoundationModelClientProtocol = FoundationModelClientFactory.make(),
+        planGenerationService: PlanGenerationService? = nil,
         calendar: Calendar = .current
     ) {
         self.foundationModelClient = foundationModelClient
+        self.planGenerationService = planGenerationService ?? PlanGenerationCoordinator(
+            aiService: AIPlanGenerationService(
+                foundationModelClient: foundationModelClient,
+                calendar: calendar
+            ),
+            fallbackService: RuleBasedPlanGenerationService()
+        )
         self.calendar = calendar
     }
     
@@ -68,18 +78,24 @@ class AIWorkoutPlanner: ObservableObject {
         isLoading = true
         errorMessage = nil
         dailyRecommendationOutput = nil
+        dailyRecommendation = nil
 
         do {
-            let prompt = buildDailyRecommendationPrompt(
+            let recommendation = try await planGenerationService.generateDailyRecommendation(
                 checkIn: checkIn,
                 goal: goal,
                 recentLogs: recentLogs,
-                activePlan: activePlan
+                currentPlan: activePlan
             )
-            dailyRecommendationOutput = try await foundationModelClient.generateDailyRecommendation(prompt: prompt)
+            dailyRecommendation = recommendation
+            dailyRecommendationOutput = DailyRecommendationOutput(recommendation: recommendation)
+            if recommendation.generationSource == .ruleBased {
+                errorMessage = recommendation.generationNotice
+            }
         } catch {
             errorMessage = mapError(error)
             dailyRecommendationOutput = nil
+            dailyRecommendation = nil
         }
 
         isLoading = false
@@ -183,66 +199,6 @@ class AIWorkoutPlanner: ObservableObject {
 
         if let steps = snapshot.stepCount {
             lines.append("- 歩数: \(steps) steps")
-        }
-
-        return lines
-    }
-
-    private func buildDailyRecommendationPrompt(
-        checkIn: DailyCheckIn,
-        goal: UserGoal?,
-        recentLogs: [TrainingLog],
-        activePlan: ActivePlan?
-    ) -> String {
-        let goalLines = makeGoalLines(from: goal)
-        let planLines = makePlanLines(from: activePlan)
-        let recentLogLines = makeRecentLogLines(from: recentLogs)
-
-        let contextLines = (goalLines + planLines + recentLogLines)
-        let contextSummary = contextLines.isEmpty
-            ? "- 目標や過去記録はまだ少ないため、継続しやすさと安全性を優先する。"
-            : contextLines.joined(separator: "\n")
-
-        return """
-        今日の体調チェックイン、目的、最近の記録から、今日の処方箋を日本語で生成してください。
-        自由文チャットではなく、UIに保存・表示する構造化出力として、指定された型の各フィールドを必ず埋めてください。
-
-        # 判断方針
-        - readinessLevelはgo/easy/restの3段階で返す
-        - restまたはrecoveryも通常の成功行動として扱う
-        - reasonsには、チェックイン値・目的・過去記録に基づく納得できる理由を3件以上含める
-        - exercisesには、休養日でも散歩、ストレッチ、水分補給、明日の確認などの回復行動を含める
-        - alternativesには、通常/短縮/回復/休養/相談の中から選択肢を3件以上含める
-        - 高強度を無理に勧めず、痛みや強い疲労がある場合は回復を優先する
-
-        # 今日のチェックイン
-        - 睡眠: \(checkIn.sleepQuality.displayName)
-        - 疲労: \(checkIn.fatigueLevel.displayName)
-        - 気分: \(checkIn.moodLevel.displayName)
-        - 筋肉痛: \(checkIn.sorenessLevel.displayName)
-        - 使える時間: \(checkIn.availableMinutes)分
-        - やる気: \(checkIn.motivationLevel.displayName)
-        - メモ: \(checkIn.note?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? checkIn.note! : "なし")
-
-        # 目的・記録
-        \(contextSummary)
-        """
-    }
-
-    private func makeGoalLines(from goal: UserGoal?) -> [String] {
-        guard let goal else { return [] }
-
-        var lines = [
-            "- 目標タイプ: \(goal.goalType.displayName)",
-            "- 目標: \(goal.title)",
-            "- 提案方針: \(goal.goalType.policySummary)"
-        ]
-
-        if let targetMetric = goal.targetMetric, !targetMetric.isEmpty {
-            lines.append("- 目標指標: \(targetMetric)")
-        }
-        if let targetDate = goal.targetDate {
-            lines.append("- 期限: \(targetDate.formatted(date: .abbreviated, time: .omitted))")
         }
 
         return lines

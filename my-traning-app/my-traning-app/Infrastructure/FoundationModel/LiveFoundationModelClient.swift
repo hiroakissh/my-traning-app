@@ -118,7 +118,7 @@ private struct FoundationAlternativePlanContent {
 }
 
 @available(iOS 26.0, macOS 26.0, *)
-@Generable(description: "今日の処方箋としてUIに保存・表示する構造化提案。必ず理由、メニュー、代替案、回復アドバイスを含める。")
+@Generable(description: "今日の処方箋としてUIに保存・表示する構造化提案。必ず理由、代替案、回復アドバイスを含める。")
 private struct FoundationDailyRecommendationContent {
     @Guide(description: "今日の状態判定。go/easy/restの3段階。")
     var readinessLevel: FoundationReadinessLevelContent
@@ -135,7 +135,7 @@ private struct FoundationDailyRecommendationContent {
     @Guide(description: "ユーザーが納得できる提案理由。チェックイン、目的、最近の記録に基づく。", .count(3...6))
     var reasons: [String]
 
-    @Guide(description: "今日のおすすめメニュー。休養日でも散歩、ストレッチ、明日の確認などの回復行動を含める。", .count(1...5))
+    @Guide(description: "今日のおすすめメニュー。fullWorkout/lightWorkoutでは1件以上。restでは空にする。", .count(0...5))
     var exercises: [FoundationPlannedExerciseContent]
 
     @Guide(description: "ユーザーが選べる代替案。短縮版、回復メニュー、休養、相談などを含める。", .count(3...4))
@@ -181,7 +181,7 @@ struct LiveFoundationModelClient: FoundationModelClientProtocol {
 
     init(systemModelProvider: @escaping () -> SystemLanguageModel = { SystemLanguageModel.default }) {
         self.systemModelProvider = systemModelProvider
-        self.instructions = Instructions("あなたはパーソナルコンディションコーチです。ユーザーの体調、気分、目的、最近の記録をもとに、運動する・軽く動く・休むを安全に判断してください。休養も計画の一部として扱い、提案には必ず理由と代替案を含めてください。")
+        self.instructions = Instructions("あなたはパーソナルコンディションコーチです。ユーザーの体調、気分、目的、最近の記録をもとに、運動する・軽く動く・休むを安全に判断してください。休養も計画の一部として扱い、提案には必ず理由と代替案を含めてください。restの場合、予定メニューは空にし、回復行動はrecoveryAdviceに書いてください。")
     }
 
     func generateTodaySuggestion(prompt: String) async throws -> String {

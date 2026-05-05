@@ -43,6 +43,10 @@ struct MainView: View {
                 DailyRecommendation.self,
                 PlannedExercise.self,
                 AlternativePlan.self,
+                WorkoutSession.self,
+                WorkoutSessionExercise.self,
+                PlannedSet.self,
+                ActualSet.self,
                 UserGoal.self,
                 WeeklyReview.self
             ] as [any PersistentModel.Type],

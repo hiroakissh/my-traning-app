@@ -148,18 +148,29 @@ final class TrainingExercise: Identifiable {
 @Model
 final class TrainingLog: Identifiable {
     @Attribute(.unique) var id: UUID
+    var recommendationId: UUID?
+    var workoutSessionId: UUID?
+    var goalId: UUID?
     var date: Date
     var startedAt: Date?
     var endedAt: Date?
     var sessionDurationSec: Int
     var purpose: TrainingPurpose
     var source: TrainingLogSource
+    var activityResultRaw: String
     var condition: TrainingCondition?
     @Relationship(deleteRule: .cascade) var exercises: [TrainingExercise]
     @Transient var strengthExercises: [StrengthExerciseLog] = []
     @Transient var cardio: CardioExerciseLog?
     @Transient var healthSnapshot: HealthDataSnapshot?
+    var averageRPE: Double?
     var note: String?
+    var createdAt: Date
+    var wasPlanned: Bool
+    var wasShortened: Bool
+    var hadSkippedItems: Bool
+    var changedToRest: Bool
+    var planDeltaSummary: String?
 
     // エイリアス（設計ドキュメントのフィールド名に合わせる）
     @Transient
@@ -174,34 +185,71 @@ final class TrainingLog: Identifiable {
         set { endedAt = newValue }
     }
 
+    @Transient
+    var totalDurationMinutes: Int {
+        max(sessionDurationSec / 60, 0)
+    }
+
+    var activityResult: ActivityResult {
+        get { ActivityResult(rawValue: activityResultRaw) ?? .completed }
+        set { activityResultRaw = newValue.rawValue }
+    }
+
+    var userNote: String? {
+        get { note }
+        set { note = newValue }
+    }
+
     init(
         id: UUID = UUID(),
+        recommendationId: UUID? = nil,
+        workoutSessionId: UUID? = nil,
+        goalId: UUID? = nil,
         date: Date,
         startedAt: Date? = nil,
         endedAt: Date? = nil,
         sessionDurationSec: Int,
         purpose: TrainingPurpose,
         source: TrainingLogSource,
+        activityResult: ActivityResult = .completed,
         condition: TrainingCondition? = nil,
         exercises: [TrainingExercise] = [],
         strengthExercises: [StrengthExerciseLog] = [],
         cardio: CardioExerciseLog? = nil,
         healthSnapshot: HealthDataSnapshot? = nil,
-        note: String? = nil
+        averageRPE: Double? = nil,
+        note: String? = nil,
+        createdAt: Date = Date(),
+        wasPlanned: Bool = false,
+        wasShortened: Bool = false,
+        hadSkippedItems: Bool = false,
+        changedToRest: Bool = false,
+        planDeltaSummary: String? = nil
     ) {
         self.id = id
+        self.recommendationId = recommendationId
+        self.workoutSessionId = workoutSessionId
+        self.goalId = goalId
         self.date = date
         self.startedAt = startedAt
         self.endedAt = endedAt
         self.sessionDurationSec = sessionDurationSec
         self.purpose = purpose
         self.source = source
+        self.activityResultRaw = activityResult.rawValue
         self.condition = condition
         self.exercises = exercises
         self.strengthExercises = strengthExercises
         self.cardio = cardio
         self.healthSnapshot = healthSnapshot
+        self.averageRPE = averageRPE
         self.note = note
+        self.createdAt = createdAt
+        self.wasPlanned = wasPlanned
+        self.wasShortened = wasShortened
+        self.hadSkippedItems = hadSkippedItems
+        self.changedToRest = changedToRest
+        self.planDeltaSummary = planDeltaSummary
     }
 }
 

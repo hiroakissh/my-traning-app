@@ -62,10 +62,11 @@ enum TrainingHistoryBuilder {
             let exerciseNames = log.exercises.map(\.name).filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             let totalSets = log.exercises.flatMap(\.sets).count
 
-            let title = exerciseNames.first ?? "トレーニング"
+            let title = exerciseNames.first ?? fallbackTitle(for: log.activityResult)
             let bodyPartText = bodyParts.isEmpty ? nil : bodyParts.map(\.displayName).sorted().joined(separator: "・")
 
             let subtitleComponents: [String?] = [
+                log.activityResult.displayName,
                 log.purpose.displayName,
                 totalSets > 0 ? "\(totalSets)セット" : nil,
                 bodyPartText
@@ -90,6 +91,19 @@ enum TrainingHistoryBuilder {
                 totalSets: totalSets,
                 searchableText: searchableText
             )
+        }
+    }
+
+    private static func fallbackTitle(for result: ActivityResult) -> String {
+        switch result {
+        case .rested:
+            return "計画的な休養"
+        case .skipped:
+            return "スキップ"
+        case .recoveryCompleted:
+            return "回復メニュー"
+        case .completed, .partiallyCompleted:
+            return "トレーニング"
         }
     }
 }

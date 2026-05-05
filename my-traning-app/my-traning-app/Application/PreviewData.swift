@@ -7,7 +7,11 @@ enum PreviewData {
             TrainingLog.self,
             TrainingExercise.self,
             TrainingSet.self,
-            TrainingCondition.self
+            TrainingCondition.self,
+            WorkoutSession.self,
+            WorkoutSessionExercise.self,
+            PlannedSet.self,
+            ActualSet.self
         ] as [any PersistentModel.Type])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         let container = try! ModelContainer(for: schema, configurations: configuration)

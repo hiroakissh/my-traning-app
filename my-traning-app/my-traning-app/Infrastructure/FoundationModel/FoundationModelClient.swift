@@ -64,10 +64,7 @@ class MockFoundationModelClient: FoundationModelClientProtocol {
                     "強い筋肉痛がある場合は高負荷を避けます。",
                     "休養も計画遵守の一部として記録します。"
                 ],
-                exercises: [
-                    PlannedExerciseOutput(name: "10分の散歩", detail: "息が上がらない範囲で歩く", targetSets: nil, targetReps: nil, weightDescription: nil, estimatedMinutes: 10, category: .cardio),
-                    PlannedExerciseOutput(name: "股関節ストレッチ", detail: "痛みのない範囲でほぐす", targetSets: 2, targetReps: nil, weightDescription: nil, estimatedMinutes: 5, category: .mobility)
-                ],
+                exercises: [],
                 alternatives: [
                     AlternativePlanOutput(title: "完全休養", description: "運動せず睡眠と食事を整える", estimatedMinutes: 0, intensity: 1),
                     AlternativePlanOutput(title: "散歩だけ", description: "10分だけ外に出る", estimatedMinutes: 10, intensity: 1),

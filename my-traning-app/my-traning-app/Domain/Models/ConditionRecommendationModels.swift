@@ -178,6 +178,22 @@ enum ActivityResult: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+enum RecommendationGenerationSource: String, Codable, CaseIterable, Identifiable {
+    case ai
+    case ruleBased
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .ai:
+            return "AI提案"
+        case .ruleBased:
+            return "安全メニュー"
+        }
+    }
+}
+
 enum GoalType: String, Codable, CaseIterable, Identifiable {
     case race
     case strength
@@ -354,6 +370,8 @@ final class DailyRecommendation {
     var recoveryAdviceStorage: String
     var generatedAt: Date
     var acceptedActionRaw: String?
+    var generationSourceRaw: String
+    var generationNotice: String?
 
     var readinessLevel: ReadinessLevel {
         get { ReadinessLevel(rawValue: readinessLevelRaw) ?? .easy }
@@ -380,6 +398,11 @@ final class DailyRecommendation {
         set { acceptedActionRaw = newValue?.rawValue }
     }
 
+    var generationSource: RecommendationGenerationSource {
+        get { RecommendationGenerationSource(rawValue: generationSourceRaw) ?? .ai }
+        set { generationSourceRaw = newValue.rawValue }
+    }
+
     init(
         id: UUID = UUID(),
         date: Date = Date(),
@@ -392,7 +415,9 @@ final class DailyRecommendation {
         alternatives: [AlternativePlan],
         recoveryAdvice: [String],
         generatedAt: Date = Date(),
-        acceptedAction: AcceptedAction? = nil
+        acceptedAction: AcceptedAction? = nil,
+        generationSource: RecommendationGenerationSource = .ai,
+        generationNotice: String? = nil
     ) {
         self.id = id
         self.date = date
@@ -406,6 +431,8 @@ final class DailyRecommendation {
         self.recoveryAdviceStorage = RecommendationTextListCodec.encode(recoveryAdvice)
         self.generatedAt = generatedAt
         self.acceptedActionRaw = acceptedAction?.rawValue
+        self.generationSourceRaw = generationSource.rawValue
+        self.generationNotice = generationNotice
     }
 }
 

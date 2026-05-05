@@ -1,6 +1,6 @@
 import Foundation
 
-struct PlannedExerciseOutput: Equatable {
+struct PlannedExerciseOutput: Codable, Equatable {
     var name: String
     var detail: String
     var targetSets: Int?
@@ -23,7 +23,7 @@ struct PlannedExerciseOutput: Equatable {
     }
 }
 
-struct AlternativePlanOutput: Equatable {
+struct AlternativePlanOutput: Codable, Equatable {
     var title: String
     var description: String
     var estimatedMinutes: Int
@@ -39,7 +39,7 @@ struct AlternativePlanOutput: Equatable {
     }
 }
 
-struct DailyRecommendationOutput: Equatable {
+struct DailyRecommendationOutput: Codable, Equatable {
     var readinessLevel: ReadinessLevel
     var recommendationType: RecommendationType
     var title: String
@@ -49,7 +49,32 @@ struct DailyRecommendationOutput: Equatable {
     var alternatives: [AlternativePlanOutput]
     var recoveryAdvice: [String]
 
-    func makeModel(date: Date = Date(), generatedAt: Date = Date()) -> DailyRecommendation {
+    init(
+        readinessLevel: ReadinessLevel,
+        recommendationType: RecommendationType,
+        title: String,
+        summary: String,
+        reasons: [String],
+        exercises: [PlannedExerciseOutput],
+        alternatives: [AlternativePlanOutput],
+        recoveryAdvice: [String]
+    ) {
+        self.readinessLevel = readinessLevel
+        self.recommendationType = recommendationType
+        self.title = title
+        self.summary = summary
+        self.reasons = reasons
+        self.exercises = exercises
+        self.alternatives = alternatives
+        self.recoveryAdvice = recoveryAdvice
+    }
+
+    func makeModel(
+        date: Date = Date(),
+        generatedAt: Date = Date(),
+        generationSource: RecommendationGenerationSource = .ai,
+        generationNotice: String? = nil
+    ) -> DailyRecommendation {
         DailyRecommendation(
             date: date,
             readinessLevel: readinessLevel,
@@ -62,8 +87,40 @@ struct DailyRecommendationOutput: Equatable {
             },
             alternatives: alternatives.map { $0.makeModel() },
             recoveryAdvice: recoveryAdvice,
-            generatedAt: generatedAt
+            generatedAt: generatedAt,
+            generationSource: generationSource,
+            generationNotice: generationNotice
         )
+    }
+
+    init(recommendation: DailyRecommendation) {
+        self.readinessLevel = recommendation.readinessLevel
+        self.recommendationType = recommendation.recommendationType
+        self.title = recommendation.title
+        self.summary = recommendation.summary
+        self.reasons = recommendation.reasons
+        self.exercises = recommendation.plannedExercises
+            .sorted { $0.order < $1.order }
+            .map {
+                PlannedExerciseOutput(
+                    name: $0.name,
+                    detail: $0.detail,
+                    targetSets: $0.targetSets,
+                    targetReps: $0.targetReps,
+                    weightDescription: $0.weightDescription,
+                    estimatedMinutes: $0.estimatedMinutes,
+                    category: $0.category
+                )
+            }
+        self.alternatives = recommendation.alternatives.map {
+            AlternativePlanOutput(
+                title: $0.title,
+                description: $0.planDescription,
+                estimatedMinutes: $0.estimatedMinutes,
+                intensity: $0.intensity
+            )
+        }
+        self.recoveryAdvice = recommendation.recoveryAdvice
     }
 }
 
@@ -110,7 +167,12 @@ struct DailyRecommendationGenerator {
             recentLogs: recentLogs,
             activePlan: activePlan
         )
-        .makeModel(date: calendar.startOfDay(for: date), generatedAt: date)
+        .makeModel(
+            date: calendar.startOfDay(for: date),
+            generatedAt: date,
+            generationSource: .ruleBased,
+            generationNotice: "今日はAI提案を作れなかったため、チェックイン内容をもとに安全なメニューを提案しています。"
+        )
     }
 
     func generateOutput(
@@ -277,13 +339,7 @@ struct DailyRecommendationGenerator {
     private func makeExercises(readiness: ReadinessLevel, goalType: GoalType, minutes: Int) -> [PlannedExerciseOutput] {
         let cappedMinutes = max(minutes, 10)
 
-        if readiness == .rest {
-            return [
-                PlannedExerciseOutput(name: "10分の散歩", detail: "息が上がらないペースで外に出るか室内を歩く", targetSets: nil, targetReps: nil, weightDescription: nil, estimatedMinutes: min(10, cappedMinutes), category: .cardio),
-                PlannedExerciseOutput(name: "股関節ストレッチ", detail: "痛みのない範囲でゆっくり伸ばす", targetSets: 2, targetReps: nil, weightDescription: nil, estimatedMinutes: 5, category: .mobility),
-                PlannedExerciseOutput(name: "明日のメニュー確認", detail: "今日休んでも計画が崩れていないことを確認する", targetSets: nil, targetReps: nil, weightDescription: nil, estimatedMinutes: 3, category: .other)
-            ]
-        }
+        if readiness == .rest { return [] }
 
         switch (readiness, goalType) {
         case (.go, .race):
@@ -393,6 +449,8 @@ struct DailyRecommendationGenerator {
 
         if readiness == .rest {
             advice.insert("休むことも計画の一部です。今日は回復できれば成功です。", at: 0)
+            advice.append("今日やることは、10分の散歩、軽いストレッチ、水分補給のどれか1つで十分です。")
+            advice.append("休んでも、計画は崩れていません。")
         } else if readiness == .easy {
             advice.insert("今日は重量やタイムを追わず、終わった後に余力が残る強度で止めます。", at: 0)
         }

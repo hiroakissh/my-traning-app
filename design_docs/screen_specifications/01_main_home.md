@@ -23,7 +23,7 @@
     -   入力済みの場合は睡眠、疲労、使える時間の要約と更新導線
 3.  **今日の予定メニュー**
     -   `DailyRecommendation.plannedExercises` を並べる
-    -   休養日でも散歩、ストレッチ、明日の確認などを表示する
+    -   `rest` の場合、予定メニューは空にし、散歩・ストレッチ・水分補給などは回復アドバイスとして表示する
 4.  **今週の進捗**
     -   今週の実行回数
     -   休養日数
@@ -44,6 +44,11 @@
 -   **TodayRecommendationView遷移:**
     -   提案カードから詳細画面へ遷移し、理由、メニュー、代替案を確認できる。
     -   ユーザーの選択は`DailyRecommendation.acceptedAction`へ保存する。
+    -   「開始」は `WorkoutSessionView` に遷移し、提案済みメニューを予定セットとして表示する。
+    -   「休む」は `TrainingLog.activityResult = rested` として保存し、`skipped` と区別する。
+-   **フォールバック表示:**
+    -   AI提案が利用できない場合でも、エラーだけで終わらせずルールベース提案を表示する。
+    -   `DailyRecommendation.generationNotice` がある場合は、ユーザーを不安にさせない補足文として表示する。
 -   **AI相談:**
     -   チャットは補助導線として扱う。
 
@@ -51,6 +56,7 @@
 
 -   `DailyCheckIn` (Domain/Models): その日の睡眠、疲労、気分、筋肉痛、使える時間、やる気。
 -   `DailyRecommendation` (Domain/Models): 今日の提案、理由、メニュー、代替案、休養アドバイス。
+-   `WorkoutSession` (Domain/Models): 提案メニューを実行中セッションとして消化するための予定/実績データ。
 -   `UserGoal` (Domain/Models): 目的別提案のための目標。
 -   `TrainingLog` (Domain/Models): 過去のトレーニング記録データ（進捗ウィジェットの計算に使用）。
 -   `WeeklyReview` (Domain/Models): 週単位の計画遵守率、実行回数、休養日数、来週の作戦。

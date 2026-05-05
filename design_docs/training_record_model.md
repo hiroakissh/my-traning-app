@@ -13,9 +13,19 @@
 | sessionDurationSec | Int | 必須 | セッション全体の所要時間（秒）。タイマー計測 or 手入力で保存 | `4500` |
 | purpose | Enum | 必須 | セッション目的。`refresh`（リフレッシュ）/`hypertrophy`（筋肥大）/`diet`（ダイエット）/`tune`（調整） | `hypertrophy` |
 | source | Enum | 必須 | ログの作成元。`timer`/`manual`/`imported` | `timer` |
+| recommendationId | UUID | 任意 | 元になったDailyRecommendation | `...` |
+| workoutSessionId | UUID | 任意 | 実行中セッションID | `...` |
+| goalId | UUID | 任意 | 紐づくUserGoal | `...` |
+| activityResult | Enum | 必須 | `completed` / `partiallyCompleted` / `recoveryCompleted` / `rested` / `skipped` | `partiallyCompleted` |
 | condition | Object | 任意 | 当日の体調。少なくとも`overallCondition`を保持 | 下記参照 |
 | exercises | Array\<TrainingExercise\> | 必須（空配列可） | 実施した種目一覧 | 下記参照 |
+| averageRPE | Double | 任意 | 実施セットの平均RPE | `7.5` |
 | note | String | 任意 | セッション全体のメモ | `睡眠短め。脚に張りあり` |
+| wasPlanned | Bool | 必須 | DailyRecommendation由来か | `true` |
+| wasShortened | Bool | 必須 | 予定より短縮したか | `true` |
+| hadSkippedItems | Bool | 必須 | セット/種目スキップがあったか | `true` |
+| changedToRest | Bool | 必須 | トレーニング提案から休養へ変更したか | `false` |
+| planDeltaSummary | String | 任意 | 予定との差分 | `予定3セット / 完了2セット / スキップ1セット` |
 
 ### condition
 
@@ -142,6 +152,15 @@
 - 目標タイプ別の最小条件（筋肥大/調整=メニュー2件以上、減量=600秒以上、リフレッシュ=180秒以上、その他=メニュー1件以上）を満たした場合のみ保存する。
 - メニュー選択のみでセット詳細が未入力の場合、`TrainingExercise`は`bodyPart=.other`、`category=.strength`、`sets=[]`で作成する。
 
+### WorkoutSession起点の保存ルール
+
+- `DailyRecommendation.plannedExercises` から `WorkoutSession.exercises` を生成してから開始する。
+- `WorkoutSessionView` は予定メニュー消化型とし、主操作をセット完了、重量/回数変更、RPE入力、セット/種目スキップ、セッション終了に絞る。
+- セッション終了時に `WorkoutSession.actualSets` から `TrainingLog.exercises` を作る。
+- 未完了の予定セットは、終了時に `SetStatus.skipped` として差分に残す。
+- `TrainingLog` には `recommendationId`、`workoutSessionId`、`activityResult`、平均RPE、予定との差分を保存する。
+- 休養記録は `WorkoutSession` を作らず、`TrainingLog.activityResult = rested` として保存する。
+
 ## Daily Check-In / Recommendationモデル
 
 毎日の意思決定はTrainingLogとは分けて保存する。TrainingLogは実行結果、DailyCheckInは実行前の状態、DailyRecommendationは今日の処方箋を表す。
@@ -171,18 +190,48 @@
 | title | String | 必須 | 今日の提案タイトル |
 | summary | String | 必須 | ホームカード本文 |
 | reasons | [String] | 必須 | 提案理由。AI提案でもルール提案でも必須 |
-| plannedExercises | [PlannedExercise] | 必須 | 今日のメニュー。休養日も回復行動を含む |
+| plannedExercises | [PlannedExercise] | 必須 | 今日の予定メニュー。`rest` の場合は空 |
 | alternatives | [AlternativePlan] | 必須 | 通常、短縮、回復、休養などの選択肢 |
 | recoveryAdvice | [String] | 必須 | 安全・回復・継続の助言 |
 | generatedAt | Date | 必須 | 生成日時 |
 | acceptedAction | AcceptedAction | 任意 | ユーザーが選んだ行動 |
+| generationSource | RecommendationGenerationSource | 必須 | `ai` / `ruleBased` |
+| generationNotice | String | 任意 | フォールバック時のユーザー向け補足 |
+
+`rest` の場合は `plannedExercises` を空にし、散歩・ストレッチ・水分補給などは `recoveryAdvice` に入れる。
+
+### WorkoutSession
+
+| フィールド | 型 | 必須 | 内容 |
+| --- | --- | --- | --- |
+| id | UUID | 必須 | セッション一意ID |
+| recommendationId | UUID | 任意 | 元になったDailyRecommendation |
+| goalId | UUID | 任意 | 紐づくUserGoal |
+| startedAt | Date | 必須 | 開始日時 |
+| endedAt | Date | 任意 | 終了日時 |
+| status | WorkoutSessionStatus | 必須 | `notStarted` / `inProgress` / `completed` / `partiallyCompleted` / `cancelled` |
+| exercises | [WorkoutSessionExercise] | 必須 | 予定と実績を持つセッション種目 |
+| userNote | String | 任意 | セッションメモ |
+
+`WorkoutSessionExercise` は `plannedSets` と `actualSets` を両方持つ。`ActualSet.status` は `planned` / `completed` / `modified` / `skipped` を保存し、予定との差分計算に使う。
+
+### ActivityResult運用
+
+`rested` と `skipped` は分ける。
+
+- `rested`: アプリの提案またはユーザー判断により、計画的に休んだ
+- `skipped`: 何もせず、記録も残さなかった / 実行しなかった
 
 ### AI構造化出力
 
 Foundation Modelsを使う場合は、自由文ではなく `@Generable` / `@Guide` で定義した構造化出力を生成する。
 UIに必要な `readinessLevel`、`recommendationType`、`title`、`summary`、`reasons`、`exercises`、`alternatives`、`recoveryAdvice` を必ず含める。
 
-AIが利用できない場合は、`DailyRecommendationGenerator.decideReadiness(checkIn:)` のルールベース判定で同じデータ構造を生成する。
+生成は `PlanGenerationService` に分離する。`AIPlanGenerationService` はFoundation Modelsの構造化出力を使い、`DailyRecommendationValidator` で検証する。
+
+検証失敗時は、何が不正だったかを含む修正プロンプトで1回だけ再生成する。無限リトライは禁止する。
+
+AIが利用できない、または再生成後も不正な場合は、`RuleBasedPlanGenerationService` が `DailyRecommendationGenerator.decideReadiness(checkIn:)` のルールベース判定で同じデータ構造を生成する。
 
 
 ### V1でUIから入力させる項目
