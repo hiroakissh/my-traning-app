@@ -10,7 +10,13 @@ struct my_traning_appApp: App {
             TrainingExercise.self,
             TrainingSet.self,
             TrainingCondition.self,
-            ActivePlan.self
+            ActivePlan.self,
+            DailyCheckIn.self,
+            DailyRecommendation.self,
+            PlannedExercise.self,
+            AlternativePlan.self,
+            UserGoal.self,
+            WeeklyReview.self
         ])
 
         let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil

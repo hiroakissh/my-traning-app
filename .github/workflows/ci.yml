@@ -20,7 +20,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Select Xcode 26
         run: |
@@ -33,7 +33,7 @@ jobs:
         id: detect_runtime
         run: |
           set -euo pipefail
-          python - <<'PY'
+          python3 - <<'PY'
           import json, os, subprocess, sys
 
           def version_tuple(v: str):
@@ -83,7 +83,8 @@ jobs:
                   name = dev.get("name", "")
                   dev_ver = device_version(dev, runtime_ver)
                   vtuple = version_tuple(dev_ver)
-                  entry = (vtuple, dev_ver, name)
+                  udid = dev.get("udid", "")
+                  entry = (vtuple, dev_ver, name, udid)
                   if name.startswith("iPhone 17"):
                       preferred.append(entry)
                   if dev_ver.startswith("26."):
@@ -104,15 +105,17 @@ jobs:
               )
               sys.exit(1)
 
-          version, version_str, name = chosen
+          version, version_str, name, udid = chosen
           print(f"runtime={version_str}")
           print(f"device_name={name}")
+          print(f"device_udid={udid}")
 
           output = os.environ.get("GITHUB_OUTPUT")
           if output:
               with open(output, "a", encoding="utf-8") as fh:
                   fh.write(f"runtime={version_str}\n")
                   fh.write(f"device_name={name}\n")
+                  fh.write(f"device_udid={udid}\n")
           else:
               print(
                   "::warning::GITHUB_OUTPUT not set; step outputs will be unavailable.",
@@ -133,11 +136,12 @@ jobs:
         run: |
           RUNTIME_VERSION="${{ steps.detect_runtime.outputs.runtime }}"
           DEVICE_NAME="${{ steps.detect_runtime.outputs.device_name }}"
-          echo "Running on simulator: ${DEVICE_NAME} (iOS ${RUNTIME_VERSION})"
+          DEVICE_UDID="${{ steps.detect_runtime.outputs.device_udid }}"
+          echo "Running on simulator: ${DEVICE_NAME} (iOS ${RUNTIME_VERSION}, ${DEVICE_UDID})"
           xcodebuild \
             -project my-traning-app/my-traning-app.xcodeproj \
             -scheme "my-traning-app" \
-            -destination "platform=iOS Simulator,name=${DEVICE_NAME},OS=${RUNTIME_VERSION}" \
+            -destination "platform=iOS Simulator,id=${DEVICE_UDID}" \
             -enableCodeCoverage YES \
             clean test
 

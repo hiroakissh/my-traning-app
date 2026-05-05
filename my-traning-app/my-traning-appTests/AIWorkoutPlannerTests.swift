@@ -5,9 +5,20 @@ import XCTest
 class MockFoundationModelClientForTest: FoundationModelClientProtocol {
     var planResponse = "Test Plan"
     var suggestionResponse = "Test Suggestion"
+    var dailyRecommendationResponse = DailyRecommendationOutput(
+        readinessLevel: .easy,
+        recommendationType: .lightWorkout,
+        title: "Test Recommendation",
+        summary: "Test Summary",
+        reasons: ["Reason 1", "Reason 2", "Reason 3"],
+        exercises: [],
+        alternatives: [],
+        recoveryAdvice: ["Advice 1", "Advice 2"]
+    )
     var errorToThrow: Error?
     var lastPlanPrompt: String?
     var lastSuggestionPrompt: String?
+    var lastDailyRecommendationPrompt: String?
 
     func generatePlan(prompt: String) async throws -> String {
         lastPlanPrompt = prompt
@@ -23,6 +34,14 @@ class MockFoundationModelClientForTest: FoundationModelClientProtocol {
             throw errorToThrow
         }
         return suggestionResponse
+    }
+
+    func generateDailyRecommendation(prompt: String) async throws -> DailyRecommendationOutput {
+        lastDailyRecommendationPrompt = prompt
+        if let errorToThrow {
+            throw errorToThrow
+        }
+        return dailyRecommendationResponse
     }
 }
 
@@ -188,5 +207,83 @@ final class AIWorkoutPlannerTests: XCTestCase {
 
         // Then
         XCTAssertEqual(planner.errorMessage, "AIセッションを初期化できませんでした。デバイスの状態を確認してから再試行してください。")
+    }
+
+    func test_suggestTodayWorkout_includesContextData() async throws {
+        // Given
+        let log = TrainingLog(
+            date: Date(),
+            sessionDurationSec: 1200,
+            purpose: .hypertrophy,
+            source: .manual,
+            exercises: [
+                TrainingExercise(
+                    name: "Bench Press",
+                    bodyPart: .chest,
+                    sets: [
+                        TrainingSet(order: 1, weightKg: 60, reps: 10, isBodyweight: false)
+                    ]
+                )
+            ]
+        )
+
+        let snapshot = HealthDataSnapshot(
+            start: Date(),
+            end: Date(),
+            averageHeartRate: 128,
+            restingHeartRate: 60,
+            activeEnergyBurned: 500,
+            basalEnergyBurned: 200,
+            distanceWalkingRunning: 5.2,
+            stepCount: 7200,
+            vo2Max: nil
+        )
+
+        let activePlan = ActivePlan(
+            horizon: .shortTerm,
+            title: "胸の日 強化",
+            summary: "ベンチプレスの重量を伸ばす短期プラン",
+            detail: "週3回のプッシュメインセッションを実施し、セット数を段階的に増やす",
+            sourcePrompt: "テスト"
+        )
+
+        let context = AIAssistantContext(
+            userQuery: "肩が張っているので軽めにしたい",
+            activePlan: activePlan,
+            recentLogs: [log],
+            healthSnapshot: snapshot,
+            dailyGoalKcal: 1650
+        )
+
+        // When
+        await planner.suggestTodayWorkout(prompt: "肩が張っているので軽めにしたい", context: context)
+
+        // Then
+        let prompt = try XCTUnwrap(mockClient.lastSuggestionPrompt)
+        XCTAssertTrue(prompt.contains("5.2 km"))
+        XCTAssertTrue(prompt.contains("平均心拍数: 128 bpm"))
+        XCTAssertTrue(prompt.contains("肩が張っているので軽めにしたい"))
+        XCTAssertTrue(prompt.contains("アクティブプラン"))
+    }
+
+    func test_generateDailyRecommendation_usesStructuredClient() async throws {
+        let checkIn = DailyCheckIn(
+            sleepQuality: .poor,
+            fatigueLevel: .high,
+            moodLevel: .low,
+            sorenessLevel: .strong,
+            availableMinutes: 10,
+            motivationLevel: .low
+        )
+        let goal = UserGoal(goalType: .strength, title: "ベンチプレス100kg", targetMetric: "100kg", priority: 1)
+
+        await planner.generateDailyRecommendation(checkIn: checkIn, goal: goal, recentLogs: [], activePlan: nil)
+
+        let prompt = try XCTUnwrap(mockClient.lastDailyRecommendationPrompt)
+        XCTAssertTrue(prompt.contains("睡眠: 悪い"))
+        XCTAssertTrue(prompt.contains("疲労: 重い"))
+        XCTAssertTrue(prompt.contains("目標タイプ: 筋力アップ"))
+        XCTAssertEqual(planner.dailyRecommendationOutput?.title, "Test Recommendation")
+        XCTAssertNil(planner.errorMessage)
     }
 }
