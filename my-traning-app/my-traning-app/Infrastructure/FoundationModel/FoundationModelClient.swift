@@ -15,28 +15,22 @@ class MockFoundationModelClient: FoundationModelClientProtocol {
 
         return PlanSuggestionsOutput(plans: [
             PlanSuggestionOutput(
-                title: "目標",
-                summary: "全体的な筋力向上と体力アップを目指します。",
+                title: "筋力アップ標準プラン",
+                summary: "週4日の分割トレーニングで主要種目を伸ばします。",
                 horizon: "longTerm",
-                detail: "目標: 主要な複合関節運動の重量を15%向上させる\n重点: ベンチプレス、スクワット、デッドリフト"
+                detail: "目標: 主要な複合関節運動の重量を15%向上させる\n方針: 胸・背中・脚・肩腕の分割法\nMonday: 胸の日 (ベンチプレス中心)\nTuesday: 脚の日 (スクワット中心)\nThursday: 背中の日 (デッドリフト、懸垂)\nFriday: 肩・腕の日\n休養: 水曜と週末は回復を優先"
             ),
             PlanSuggestionOutput(
-                title: "今のフェーズ",
-                summary: "週4日の筋肥大トレーニングで土台を作ります。",
+                title: "短時間集中プラン",
+                summary: "忙しい週でも主種目だけは継続します。",
                 horizon: "midTerm",
-                detail: "方針: 筋肥大トレーニング\n頻度: 週4回\n内容: 胸・背中・脚・肩腕の分割法"
+                detail: "目標: 週3回でベンチプレスとスクワットを維持向上\n方針: 各回30分以内で主種目を優先\nMonday: ベンチプレスとロー\nWednesday: スクワットと体幹\nFriday: 肩・腕を短時間\n休養: 火木土日は散歩かストレッチ"
             ),
             PlanSuggestionOutput(
-                title: "今週の作戦",
-                summary: "曜日ごとに部位を分け、休養も計画に含めます。",
+                title: "回復優先プラン",
+                summary: "疲労を残しすぎず、軽めの日を計画に含めます。",
                 horizon: "shortTerm",
-                detail: "Monday: 胸の日 (ベンチプレス中心)\nTuesday: 脚の日 (スクワット中心)\nWednesday: 休息\nThursday: 背中の日 (デッドリフト、懸垂)\nFriday: 肩・腕の日\n週末: 休息または軽い有酸素運動"
-            ),
-            PlanSuggestionOutput(
-                title: "今日やること",
-                summary: "フォームを優先して胸のメイン種目から始めます。",
-                horizon: "general",
-                detail: "内容: ベンチプレスを軽めから3セット\n強度: RPE 7程度"
+                detail: "目標: 継続を止めずに疲労を抜く\n方針: RPE 6〜7を上限にフォーム確認を重視\nMonday: 上半身ライト\nWednesday: 下半身ライト\nFriday: 全身サーキット\n休養: 火木土日はストレッチと散歩"
             )
         ])
     }

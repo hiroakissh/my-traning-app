@@ -81,9 +81,9 @@ private struct FoundationPlanSuggestionContent {
 }
 
 @available(iOS 26.0, macOS 26.0, *)
-@Generable(description: "長期プラン生成の構造化出力。必ず4件のプランを返す。")
+@Generable(description: "長期プラン生成の構造化出力。ユーザーが選べる複数の完全なプラン候補を返す。")
 private struct FoundationPlanSuggestionsContent {
-    @Guide(description: "Goal、Phase、Week、Todayに対応する4件のプラン。", .count(4...4))
+    @Guide(description: "ユーザーがアクティブプランとして選べる2〜3件の候補。各候補はGoal、Phase、Week、Today相当の情報をdetailに含める。", .count(2...3))
     var plans: [FoundationPlanSuggestionContent]
 
     var domainValue: PlanSuggestionsOutput {
@@ -254,19 +254,21 @@ struct LiveFoundationModelClient: FoundationModelClientProtocol {
         let session = try makeSessionIfNeeded()
 
         let longTermPrompt = """
-        以下の情報に基づき、Goal（目標）/ Phase（今のフェーズ）/ Week（今週の作戦）/ Today（今日やること）の観点でトレーニングプランを提案してください。
+        以下の情報に基づき、ユーザーがアクティブプランとして選べる複数のトレーニングプラン候補を提案してください。
 
         # 依頼内容
         \(prompt)
 
         # 出力要件
         - Foundation Modelsの構造化出力に従う
-        - plans配列にGoal／Phase／Week／Todayの4件を含める
+        - plans配列に2〜3件の候補プランを含める
+        - 各候補は単独でアクティブプランとして採用できる完全な内容にする
         - title / summary / detail にMarkdown、コードフェンス、説明文、装飾記号を含めない
         - 週あたりの頻度と主なフォーカス部位を明示する
         - ボリュームや負荷は現実的な範囲で段階的に増やす
         - 休養や軽めの日も計画の一部として明示する
         - detailはUIが扱いやすいように「項目名: 内容」を改行区切りにする
+        - detailには目標、方針、曜日ごとの作戦、休養方針、今日の最小アクションを含める
         """
 
         let structuredPrompt = Prompt(longTermPrompt)

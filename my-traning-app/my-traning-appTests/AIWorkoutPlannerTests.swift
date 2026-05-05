@@ -177,6 +177,8 @@ final class AIWorkoutPlannerTests: XCTestCase {
         XCTAssertTrue(prompt.contains("筋力アップ"))
         XCTAssertTrue(prompt.contains("回答はJSONのみ"))
         XCTAssertTrue(prompt.contains("Markdown"))
+        XCTAssertTrue(prompt.contains("アクティブプランとして選べる"))
+        XCTAssertTrue(prompt.contains("Goal / Phase / Week / Today を別カードに分割しない"))
     }
 
     func test_suggestTodayWorkout_failure() async {
@@ -294,6 +296,7 @@ final class AIWorkoutPlannerTests: XCTestCase {
         XCTAssertTrue(prompt.contains("平均心拍数: 128 bpm"))
         XCTAssertTrue(prompt.contains("肩が張っているので軽めにしたい"))
         XCTAssertTrue(prompt.contains("アクティブプラン"))
+        XCTAssertTrue(prompt.contains("週3回のプッシュメインセッション"))
     }
 
     func test_generateDailyRecommendation_usesStructuredClient() async throws {

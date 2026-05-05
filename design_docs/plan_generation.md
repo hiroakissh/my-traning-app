@@ -59,13 +59,19 @@ AIには自由文だけを返させない。Foundation Models を使う場合は
 - 疲労、睡眠不足、強い筋肉痛がある場合は `easy` または `rest` を優先
 - 休養は失敗ではなく計画の一部として扱う
 
-長期・週間プランでは、`PlanSuggestionsOutput` として次の構造を返す。
+長期・週間プランでは、`PlanSuggestionsOutput` としてユーザーが選べる複数候補を返す。
 
-- `plans`: Goal / Phase / Week / Today に対応する4件
+- `plans`: アクティブプランとして採用できる2〜3件の完全な候補
 - `title`: Markdown記号を含まない短いタイトル
 - `summary`: カード表示用の1文要約
 - `horizon`: `longTerm` / `midTerm` / `shortTerm` / `general`
-- `detail`: `項目名: 内容` の改行区切り。曜日は `Monday: 胸` のようにキー化する。
+- `detail`: `項目名: 内容` の改行区切り。目標、方針、曜日ごとの作戦、休養方針、今日の最小アクションを含める。曜日は `Monday: 胸` のようにキー化する。
+
+重要:
+
+- Goal / Phase / Week / Today を別カードに分割しない。
+- 各 `plans` の1件が、単独で `ActivePlan` として保存できる内容にする。
+- ユーザーが採用した最新の `ActivePlan` は、日次提案とAI相談の入力コンテキストに渡す。
 
 ## フォールバック
 

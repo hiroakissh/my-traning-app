@@ -43,38 +43,39 @@ class AIWorkoutPlanner: ObservableObject {
         
         // ユーザー情報からプロンプトを生成
         let prompt = """
-        以下のユーザー情報と目標に基づいて、最適なトレーニングプランを提案してください。
+        以下のユーザー情報と目標に基づいて、ユーザーがアクティブプランとして選べる複数のトレーニングプラン候補を提案してください。
         回答はJSONのみで返してください。Markdown、コードフェンス、装飾記号、説明文は含めないでください。
 
         # JSON形式
         {
           "plans": [
             {
-              "title": "目標",
-              "summary": "プランの要約",
+              "title": "筋力アップ標準プラン",
+              "summary": "この候補の要約",
               "horizon": "longTerm",
-              "detail": "目標: ...\\n重点: ..."
+              "detail": "目標: ...\\n方針: ...\\nMonday: ...\\nWednesday: ...\\nFriday: ...\\n休養: ...\\n今日やること: ..."
             },
             {
-              "title": "今のフェーズ",
-              "summary": "現在の取り組み方",
+              "title": "短時間集中プラン",
+              "summary": "この候補の要約",
               "horizon": "midTerm",
-              "detail": "方針: ...\\n頻度: ..."
+              "detail": "目標: ...\\n方針: ...\\nMonday: ...\\nWednesday: ...\\nFriday: ...\\n休養: ...\\n今日やること: ..."
             },
             {
-              "title": "今週の作戦",
-              "summary": "曜日ごとの進め方",
+              "title": "回復優先プラン",
+              "summary": "この候補の要約",
               "horizon": "shortTerm",
-              "detail": "Monday: ...\\nWednesday: ...\\nFriday: ...\\nボリューム: ...\\n負荷: ...\\n休養: ...\\nTuesday: ..."
-            },
-            {
-              "title": "今日やること",
-              "summary": "今日の最小アクション",
-              "horizon": "general",
-              "detail": "内容: ...\\n強度: ..."
+              "detail": "目標: ...\\n方針: ...\\nMonday: ...\\nWednesday: ...\\nFriday: ...\\n休養: ...\\n今日やること: ..."
             }
           ]
         }
+
+        # 生成ルール
+        - plans は2〜3件
+        - 各 plans の1件が、単独でアクティブプランとして採用できる完全な候補
+        - Goal / Phase / Week / Today を別カードに分割しない
+        - detail は「項目名: 内容」の改行区切り
+        - 休養や軽めの日も計画の一部として含める
 
         # ユーザー情報
         - 年齢: \(userProfile.age)歳
@@ -203,7 +204,8 @@ class AIWorkoutPlanner: ObservableObject {
         guard let plan else { return [] }
         return [
             "- アクティブプラン: \(plan.title)",
-            "- 概要: \(plan.summary)"
+            "- 概要: \(plan.summary)",
+            "- 詳細: \(plan.detail)"
         ]
     }
 

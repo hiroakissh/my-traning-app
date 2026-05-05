@@ -178,12 +178,8 @@ struct PlanningView: View {
                     .padding(.vertical, AppLayout.grid)
             } else {
                 VStack(spacing: AppLayout.grid * 1.5) {
-                    ForEach(Array(planner.planSuggestions.enumerated()), id: \.element.id) { index, suggestion in
-                        if index == 0 {
-                            descriptionCard(suggestion)
-                        } else {
-                            suggestionCard(suggestion)
-                        }
+                    ForEach(planner.planSuggestions) { suggestion in
+                        suggestionCard(suggestion)
                     }
                 }
             }
@@ -194,7 +190,9 @@ struct PlanningView: View {
         VStack(alignment: .leading, spacing: AppLayout.grid * 1.2) {
             HStack(spacing: AppLayout.grid) {
                 pill(text: suggestion.horizon.displayName.uppercased())
-                if Calendar.current.isDateInToday(suggestion.createdAt) {
+                if isActivePlan(suggestion) {
+                    pill(text: "選択中", secondary: false)
+                } else if Calendar.current.isDateInToday(suggestion.createdAt) {
                     pill(text: "RECOMMENDED", secondary: true)
                 }
             }
@@ -211,13 +209,13 @@ struct PlanningView: View {
             }
 
             Button(action: { adoptPlan(from: suggestion) }) {
-                Text("プランを採用 →")
+                Text(isActivePlan(suggestion) ? "アクティブプラン" : "アクティブプランにする →")
                     .font(AppTypography.body(16, weight: .semibold))
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .tint(AppColors.primary)
-            .disabled(planner.isLoading)
+            .disabled(planner.isLoading || isActivePlan(suggestion))
         }
         .padding(AppLayout.grid * 2)
         .glassCardStyle()
@@ -304,14 +302,16 @@ struct PlanningView: View {
                 .buttonStyle(.bordered)
                 .tint(AppColors.primary)
 
-                NavigationLink(destination: EmptyView()) {
-                    Label("プランを変更", systemImage: "square.and.pencil")
+                Button {
+                    triggerPlanGeneration = true
+                } label: {
+                    Label("別プランを提案", systemImage: "square.grid.2x2")
                         .font(AppTypography.body(15, weight: .semibold))
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
                 .tint(AppColors.textSecondary)
-                .disabled(true) // 実装プレースホルダー
+                .disabled(planner.isLoading)
             }
         }
         .padding(AppLayout.grid * 2)
@@ -380,14 +380,16 @@ struct PlanningView: View {
                 .buttonStyle(.bordered)
                 .tint(AppColors.secondary)
 
-                NavigationLink(destination: EmptyView()) {
-                    Label("プランを変更", systemImage: "square.and.pencil")
+                Button {
+                    triggerPlanGeneration = true
+                } label: {
+                    Label("別プランを提案", systemImage: "square.grid.2x2")
                         .font(AppTypography.body(15, weight: .semibold))
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
                 .tint(AppColors.textSecondary)
-                .disabled(true) // プレースホルダー
+                .disabled(planner.isLoading)
             }
         }
         .padding(AppLayout.grid * 2)
@@ -410,6 +412,13 @@ struct PlanningView: View {
         }
     }
 
+    private func isActivePlan(_ suggestion: PlanSuggestion) -> Bool {
+        guard let activePlan else { return false }
+        return activePlan.title == suggestion.title
+            && activePlan.summary == suggestion.summary
+            && activePlan.detail == suggestion.detail
+    }
+
     private func buildGoalPrompt() -> String {
         let trimmed = goalText.trimmingCharacters(in: .whitespacesAndNewlines)
         let goal = trimmed.isEmpty ? "3ヶ月で筋力アップを目指す" : trimmed
@@ -429,22 +438,6 @@ struct PlanningView: View {
         if text.contains("中強度") { return "中強度" }
         if text.contains("低強度") { return "低強度" }
         return nil
-    }
-
-    private func descriptionCard(_ suggestion: PlanSuggestion) -> some View {
-        VStack(alignment: .leading, spacing: AppLayout.grid) {
-            HStack {
-                pill(text: "ACTIVE PLAN", secondary: true)
-                Spacer()
-                pill(text: suggestion.horizon.displayName.uppercased(), secondary: true)
-            }
-            Text(suggestion.title)
-                .font(AppTypography.body(18, weight: .semibold))
-                .foregroundColor(AppColors.textPrimary)
-            PlanDetailContentView(detail: suggestion.detail)
-        }
-        .padding(AppLayout.grid * 2)
-        .glassCardStyle()
     }
 
     private func planProgressRate(for plan: ActivePlan) -> Double {
