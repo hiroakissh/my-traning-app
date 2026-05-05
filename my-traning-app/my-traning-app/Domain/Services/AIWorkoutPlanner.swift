@@ -44,7 +44,37 @@ class AIWorkoutPlanner: ObservableObject {
         // ユーザー情報からプロンプトを生成
         let prompt = """
         以下のユーザー情報と目標に基づいて、最適なトレーニングプランを提案してください。
-        マークダウンを使わず、プレーンテキストのみで回答してください。箇条書きはハイフン区切りで構いません。
+        回答はJSONのみで返してください。Markdown、コードフェンス、装飾記号、説明文は含めないでください。
+
+        # JSON形式
+        {
+          "plans": [
+            {
+              "title": "目標",
+              "summary": "プランの要約",
+              "horizon": "longTerm",
+              "detail": "目標: ...\\n重点: ..."
+            },
+            {
+              "title": "今のフェーズ",
+              "summary": "現在の取り組み方",
+              "horizon": "midTerm",
+              "detail": "方針: ...\\n頻度: ..."
+            },
+            {
+              "title": "今週の作戦",
+              "summary": "曜日ごとの進め方",
+              "horizon": "shortTerm",
+              "detail": "Monday: ...\\nWednesday: ...\\nFriday: ...\\nボリューム: ...\\n負荷: ...\\n休養: ...\\nTuesday: ..."
+            },
+            {
+              "title": "今日やること",
+              "summary": "今日の最小アクション",
+              "horizon": "general",
+              "detail": "内容: ...\\n強度: ..."
+            }
+          ]
+        }
 
         # ユーザー情報
         - 年齢: \(userProfile.age)歳
@@ -58,7 +88,7 @@ class AIWorkoutPlanner: ObservableObject {
         
         do {
             let plan = try await foundationModelClient.generatePlan(prompt: prompt)
-            self.generatedPlan = plan
+            self.generatedPlan = plan.jsonString
             self.planSuggestions = PlanSuggestionMapper.map(from: plan, prompt: prompt)
         } catch {
             self.errorMessage = mapError(error)

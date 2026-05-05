@@ -28,7 +28,17 @@ RuleBasedPlanGenerationServiceへフォールバック
 
 ## 構造化出力
 
-AIには自由文だけを返させない。必ず次の情報を構造化して返す。
+AIには自由文だけを返させない。Foundation Models を使う場合は、保存・表示に使う出力を `@Generable` / `@Guide` で構造化する。
+
+実装ルール:
+
+- `LanguageModelSession.respond(to:)` の自由文戻り値を、そのままSwiftDataモデルやUIへ保存しない。
+- 保存・表示に使う出力は `respond(to:generating:)` を使い、`@Generable` 型を通す。
+- `@Guide` には件数制約、数値範囲、Markdown禁止、休養時の空メニューなどの制約を書く。
+- 生成後は Domain のDTOへ変換し、Validator / Mapper を通してから利用する。
+- 既存データに Markdown 風文字列が残っている場合も、表示直前に `PlanDisplayContent` のような表示用構造へ変換する。
+
+日次提案では、必ず次の情報を構造化して返す。
 
 - `readinessLevel`
 - `recommendationType`
@@ -48,6 +58,14 @@ AIには自由文だけを返させない。必ず次の情報を構造化して
 - `alternatives` は最低2件
 - 疲労、睡眠不足、強い筋肉痛がある場合は `easy` または `rest` を優先
 - 休養は失敗ではなく計画の一部として扱う
+
+長期・週間プランでは、`PlanSuggestionsOutput` として次の構造を返す。
+
+- `plans`: Goal / Phase / Week / Today に対応する4件
+- `title`: Markdown記号を含まない短いタイトル
+- `summary`: カード表示用の1文要約
+- `horizon`: `longTerm` / `midTerm` / `shortTerm` / `general`
+- `detail`: `項目名: 内容` の改行区切り。曜日は `Monday: 胸` のようにキー化する。
 
 ## フォールバック
 

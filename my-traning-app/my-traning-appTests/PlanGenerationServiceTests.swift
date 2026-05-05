@@ -9,8 +9,8 @@ private final class SequencedFoundationModelClient: FoundationModelClientProtoco
         self.dailyResponses = dailyResponses
     }
 
-    func generatePlan(prompt: String) async throws -> String {
-        "unused"
+    func generatePlan(prompt: String) async throws -> PlanSuggestionsOutput {
+        PlanSuggestionsOutput(plans: [])
     }
 
     func generateTodaySuggestion(prompt: String) async throws -> String {

@@ -2,39 +2,43 @@ import Foundation
 
 // Foundation Model APIクライアントの振る舞いを定義するプロトコル
 protocol FoundationModelClientProtocol {
-    func generatePlan(prompt: String) async throws -> String
+    func generatePlan(prompt: String) async throws -> PlanSuggestionsOutput
     func generateTodaySuggestion(prompt: String) async throws -> String
     func generateDailyRecommendation(prompt: String) async throws -> DailyRecommendationOutput
 }
 
 // 開発・テスト用のモッククライアント
 class MockFoundationModelClient: FoundationModelClientProtocol {
-    func generatePlan(prompt: String) async throws -> String {
+    func generatePlan(prompt: String) async throws -> PlanSuggestionsOutput {
         // 実際のAPI通信を模倣するために2秒待つ
         try await Task.sleep(nanoseconds: 2_000_000_000)
-        
-        // ダミーのプラン提案を返す
-        let dummyPlan = """
-        ## 新しいトレーニングプラン
 
-        ### Goal（目標）
-        - **目標:** 全体的な筋力向上と体力アップ
-        - **フォーカス:** 主要な複合関節運動の重量を15%向上させる
-
-        ### Phase（今のフェーズ）
-        - **方針:** 筋肥大トレーニング (週4日)
-        - **内容:** 胸・背中・脚・肩腕の分割法
-
-        ### Week（今週の作戦）
-        - **月:** 胸の日 (ベンチプレス中心)
-        - **火:** 脚の日 (スクワット中心)
-        - **水:** 休息
-        - **木:** 背中の日 (デッドリフト、懸垂)
-        - **金:** 肩・腕の日
-        - **土日:** 休息または軽い有酸素運動
-        """
-        
-        return dummyPlan
+        return PlanSuggestionsOutput(plans: [
+            PlanSuggestionOutput(
+                title: "目標",
+                summary: "全体的な筋力向上と体力アップを目指します。",
+                horizon: "longTerm",
+                detail: "目標: 主要な複合関節運動の重量を15%向上させる\n重点: ベンチプレス、スクワット、デッドリフト"
+            ),
+            PlanSuggestionOutput(
+                title: "今のフェーズ",
+                summary: "週4日の筋肥大トレーニングで土台を作ります。",
+                horizon: "midTerm",
+                detail: "方針: 筋肥大トレーニング\n頻度: 週4回\n内容: 胸・背中・脚・肩腕の分割法"
+            ),
+            PlanSuggestionOutput(
+                title: "今週の作戦",
+                summary: "曜日ごとに部位を分け、休養も計画に含めます。",
+                horizon: "shortTerm",
+                detail: "Monday: 胸の日 (ベンチプレス中心)\nTuesday: 脚の日 (スクワット中心)\nWednesday: 休息\nThursday: 背中の日 (デッドリフト、懸垂)\nFriday: 肩・腕の日\n週末: 休息または軽い有酸素運動"
+            ),
+            PlanSuggestionOutput(
+                title: "今日やること",
+                summary: "フォームを優先して胸のメイン種目から始めます。",
+                horizon: "general",
+                detail: "内容: ベンチプレスを軽めから3セット\n強度: RPE 7程度"
+            )
+        ])
     }
     
     func generateTodaySuggestion(prompt: String) async throws -> String {

@@ -203,10 +203,7 @@ struct PlanningView: View {
                 .font(AppTypography.body(18, weight: .semibold))
                 .foregroundColor(AppColors.textPrimary)
 
-            Text(suggestion.detail)
-                .font(AppTypography.body(14))
-                .foregroundColor(AppColors.textSecondary)
-                .lineLimit(4)
+            PlanDetailContentView(detail: suggestion.detail, mode: .compact(maxItems: 3))
 
             HStack(spacing: AppLayout.grid) {
                 metricChip(title: "頻度", value: frequencyText(from: suggestion.detail) ?? "調整可", systemImage: "calendar")
@@ -294,10 +291,7 @@ struct PlanningView: View {
                 .font(AppTypography.label())
                 .foregroundColor(AppColors.textSecondary)
                 .lineLimit(3)
-            Text(plan.detail)
-                .font(AppTypography.label())
-                .foregroundColor(AppColors.textSecondary)
-                .lineLimit(5)
+            PlanDetailContentView(detail: plan.detail, mode: .compact(maxItems: 4))
 
             HStack(spacing: AppLayout.grid) {
                 Button {
@@ -363,10 +357,7 @@ struct PlanningView: View {
             Text("プラン概要")
                 .font(AppTypography.body(15, weight: .semibold))
                 .foregroundColor(AppColors.textPrimary)
-            Text(plan.detail)
-                .font(AppTypography.body(14))
-                .foregroundColor(AppColors.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
+            PlanDetailContentView(detail: plan.detail)
 
             Button {
                 triggerPlanGeneration = true
@@ -450,10 +441,7 @@ struct PlanningView: View {
             Text(suggestion.title)
                 .font(AppTypography.body(18, weight: .semibold))
                 .foregroundColor(AppColors.textPrimary)
-            Text(suggestion.detail)
-                .font(AppTypography.body(14))
-                .foregroundColor(AppColors.textSecondary)
-                .lineLimit(nil)
+            PlanDetailContentView(detail: suggestion.detail)
         }
         .padding(AppLayout.grid * 2)
         .glassCardStyle()

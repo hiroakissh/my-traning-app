@@ -384,10 +384,7 @@ struct HomeView: View {
                         .font(AppTypography.label(13))
                         .foregroundColor(AppColors.textSecondary)
                         .lineLimit(2)
-                    Text(activePlan.detail)
-                        .font(AppTypography.label(12))
-                        .foregroundColor(AppColors.textSecondary)
-                        .lineLimit(3)
+                    PlanDetailContentView(detail: activePlan.detail, mode: .compact(maxItems: 3))
                 }
             } else {
                 Text("まだプランが設定されていません。プランタブからAIに再提案を依頼してください。")
