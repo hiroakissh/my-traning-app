@@ -10,24 +10,24 @@ enum PlanHorizon: String, Codable, CaseIterable {
     var displayName: String {
         switch self {
         case .longTerm:
-            return "長期プラン"
+            return "目標"
         case .midTerm:
-            return "中期プラン"
+            return "今のフェーズ"
         case .shortTerm:
-            return "短期プラン"
+            return "今週の作戦"
         case .general:
-            return "プラン"
+            return "今日やること"
         }
     }
 
     static func fromTitle(_ title: String) -> PlanHorizon {
-        if title.contains("長期") {
+        if title.contains("長期") || title.localizedCaseInsensitiveContains("goal") || title.contains("目標") {
             return .longTerm
         }
-        if title.contains("中期") {
+        if title.contains("中期") || title.localizedCaseInsensitiveContains("phase") || title.contains("フェーズ") {
             return .midTerm
         }
-        if title.contains("短期") {
+        if title.contains("短期") || title.localizedCaseInsensitiveContains("week") || title.contains("今週") {
             return .shortTerm
         }
         return .general

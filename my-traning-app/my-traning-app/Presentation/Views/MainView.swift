@@ -26,6 +26,7 @@ struct MainView: View {
         }
         .hudBackground()
         .tint(AppColors.primary)
+        .applyHudTabBarChrome()
     }
 }
 
@@ -37,8 +38,28 @@ struct MainView: View {
                 TrainingLog.self,
                 TrainingExercise.self,
                 TrainingSet.self,
-                TrainingCondition.self
+                TrainingCondition.self,
+                DailyCheckIn.self,
+                DailyRecommendation.self,
+                PlannedExercise.self,
+                AlternativePlan.self,
+                UserGoal.self,
+                WeeklyReview.self
             ] as [any PersistentModel.Type],
             inMemory: true
         )
+}
+
+private extension View {
+    @ViewBuilder
+    func applyHudTabBarChrome() -> some View {
+        #if os(iOS)
+        self
+            .toolbarBackground(AppColors.background, for: .tabBar)
+            .toolbarBackground(.visible, for: .tabBar)
+            .toolbarColorScheme(.dark, for: .tabBar)
+        #else
+        self
+        #endif
+    }
 }

@@ -83,18 +83,45 @@ private struct HudFieldModifier: ViewModifier {
 
 private struct HudBackgroundModifier: ViewModifier {
     func body(content: Content) -> some View {
+        ZStack {
+            hudBackgroundGradient
+            content
+        }
+        .background(AppColors.background.ignoresSafeArea())
+        .preferredColorScheme(.dark)
+    }
+
+    private var hudBackgroundGradient: some View {
+        LinearGradient(
+            colors: [
+                AppColors.background,
+                AppColors.surface.opacity(0.82),
+                AppColors.background
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .ignoresSafeArea()
+    }
+}
+
+private struct HudScrollBackgroundModifier: ViewModifier {
+    func body(content: Content) -> some View {
         content
+            .scrollContentBackgroundHiddenIfAvailable()
             .background(
                 LinearGradient(
                     colors: [
                         AppColors.background,
-                        AppColors.background.opacity(0.96)
+                        AppColors.surface.opacity(0.82),
+                        AppColors.background
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
                 .ignoresSafeArea()
             )
+            .preferredColorScheme(.dark)
     }
 }
 
@@ -150,6 +177,19 @@ extension View {
 
     func hudBackground() -> some View {
         modifier(HudBackgroundModifier())
+    }
+
+    func hudScrollBackground() -> some View {
+        modifier(HudScrollBackgroundModifier())
+    }
+
+    @ViewBuilder
+    fileprivate func scrollContentBackgroundHiddenIfAvailable() -> some View {
+        if #available(iOS 16.0, macOS 13.0, *) {
+            self.scrollContentBackground(.hidden)
+        } else {
+            self
+        }
     }
 }
 

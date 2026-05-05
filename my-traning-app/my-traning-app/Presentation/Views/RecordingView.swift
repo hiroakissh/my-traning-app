@@ -49,7 +49,6 @@ struct RecordingView: View {
                     header
                     purposeChips
                     workoutTabs
-//                    menuSelection
                     timerSection
                     saveControls
                     if let statusMessage, let statusKind {
@@ -59,14 +58,15 @@ struct RecordingView: View {
                 .padding(.horizontal, AppLayout.grid * 2)
                 .padding(.vertical, AppLayout.grid * 2.5)
             }
+            .hudScrollBackground()
             .navigationTitle("")
-            .navigationBarHidden(true)
-            .hudBackground()
+            .applyIOSNavigationBarHidden(true)
         }
+        .hudBackground()
         .onReceive(timer) { now in
             timerState.tick(now: now)
         }
-        .onChange(of: selectedPurpose) { _ in
+        .onChange(of: selectedPurpose) { _, _ in
             clearStatus()
         }
     }
@@ -459,4 +459,14 @@ private enum StatusKind {
 #Preview {
     RecordingView()
         .modelContainer(for: [TrainingLog.self, TrainingCondition.self, TrainingExercise.self, TrainingSet.self] as [any PersistentModel.Type], inMemory: true)
+}
+private extension View {
+    @ViewBuilder
+    func applyIOSNavigationBarHidden(_ hidden: Bool) -> some View {
+        #if os(iOS)
+        self.navigationBarHidden(hidden)
+        #else
+        self
+        #endif
+    }
 }

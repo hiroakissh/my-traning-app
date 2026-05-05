@@ -55,11 +55,12 @@ struct HistoryView: View {
                 .padding(.horizontal, AppLayout.grid * 2)
                 .padding(.vertical, AppLayout.grid * 2.5)
             }
-            .navigationBarTitleDisplayMode(.inline)
+            .hudScrollBackground()
+            .applyIOSNavigationBarStyle()
             .navigationTitle("")
-            .hudBackground()
             .onAppear(perform: initializeSelectedDate)
         }
+        .hudBackground()
     }
 
     // MARK: - Header
@@ -510,4 +511,15 @@ private struct HistoryEmptyState: View {
 #Preview {
     HistoryView()
         .modelContainer(PreviewData.previewContainer)
+}
+
+private extension View {
+    @ViewBuilder
+    func applyIOSNavigationBarStyle() -> some View {
+        #if os(iOS)
+        self.navigationBarTitleDisplayMode(.inline)
+        #else
+        self
+        #endif
+    }
 }

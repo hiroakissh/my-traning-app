@@ -37,10 +37,11 @@ struct PlanningView: View {
                 .padding(.horizontal, AppLayout.grid * 2)
                 .padding(.vertical, AppLayout.grid * 2.5)
             }
-            .scrollContentBackground(.hidden)
+            .hudScrollBackground()
             .navigationTitle("")
-            .navigationBarHidden(true)
+            .applyIOSNavigationBarHidden(true)
             .toolbar {
+                #if os(iOS)
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { triggerPlanGeneration = true }) {
                         Image(systemName: "arrow.clockwise.circle.fill")
@@ -48,6 +49,15 @@ struct PlanningView: View {
                     }
                     .disabled(planner.isLoading)
                 }
+                #else
+                ToolbarItem(placement: .automatic) {
+                    Button(action: { triggerPlanGeneration = true }) {
+                        Image(systemName: "arrow.clockwise.circle.fill")
+                            .foregroundColor(AppColors.primary)
+                    }
+                    .disabled(planner.isLoading)
+                }
+                #endif
             }
             // triggerPlanGenerationがtrueになったら非同期タスクを実行
             .task(id: triggerPlanGeneration) {
@@ -67,8 +77,7 @@ struct PlanningView: View {
                     Text(persistenceError)
                 }
             }
-            .toolbarBackground(.hidden, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
+            .applyIOSNavigationBarChrome()
         }
         .hudBackground()
     }
@@ -89,7 +98,7 @@ struct PlanningView: View {
                     .foregroundColor(AppColors.primary)
                 TextField("3ヶ月でベンチプレスを100kgにしたい", text: $goalText)
                     .foregroundColor(AppColors.textPrimary)
-                    .textInputAutocapitalization(.sentences)
+                    .applyGoalTextAutocapitalization()
                 Button(action: { triggerPlanGeneration = true }) {
                     Image(systemName: "arrow.up.circle.fill")
                         .font(.system(size: 28))
@@ -479,4 +488,35 @@ struct PlanningView: View {
 #Preview {
     PlanningView()
         .modelContainer(for: ActivePlan.self, inMemory: true)
+}
+
+private extension View {
+    @ViewBuilder
+    func applyIOSNavigationBarHidden(_ hidden: Bool) -> some View {
+        #if os(iOS)
+        self.navigationBarHidden(hidden)
+        #else
+        self
+        #endif
+    }
+
+    @ViewBuilder
+    func applyIOSNavigationBarChrome() -> some View {
+        #if os(iOS)
+        self
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+        #else
+        self
+        #endif
+    }
+
+    @ViewBuilder
+    func applyGoalTextAutocapitalization() -> some View {
+        #if os(iOS)
+        self.textInputAutocapitalization(.sentences)
+        #else
+        self
+        #endif
+    }
 }

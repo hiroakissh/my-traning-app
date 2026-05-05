@@ -5,9 +5,20 @@ import XCTest
 class MockFoundationModelClientForTest: FoundationModelClientProtocol {
     var planResponse = "Test Plan"
     var suggestionResponse = "Test Suggestion"
+    var dailyRecommendationResponse = DailyRecommendationOutput(
+        readinessLevel: .easy,
+        recommendationType: .lightWorkout,
+        title: "Test Recommendation",
+        summary: "Test Summary",
+        reasons: ["Reason 1", "Reason 2", "Reason 3"],
+        exercises: [],
+        alternatives: [],
+        recoveryAdvice: ["Advice 1", "Advice 2"]
+    )
     var errorToThrow: Error?
     var lastPlanPrompt: String?
     var lastSuggestionPrompt: String?
+    var lastDailyRecommendationPrompt: String?
 
     func generatePlan(prompt: String) async throws -> String {
         lastPlanPrompt = prompt
@@ -23,6 +34,14 @@ class MockFoundationModelClientForTest: FoundationModelClientProtocol {
             throw errorToThrow
         }
         return suggestionResponse
+    }
+
+    func generateDailyRecommendation(prompt: String) async throws -> DailyRecommendationOutput {
+        lastDailyRecommendationPrompt = prompt
+        if let errorToThrow {
+            throw errorToThrow
+        }
+        return dailyRecommendationResponse
     }
 }
 
@@ -245,5 +264,26 @@ final class AIWorkoutPlannerTests: XCTestCase {
         XCTAssertTrue(prompt.contains("平均心拍数: 128 bpm"))
         XCTAssertTrue(prompt.contains("肩が張っているので軽めにしたい"))
         XCTAssertTrue(prompt.contains("アクティブプラン"))
+    }
+
+    func test_generateDailyRecommendation_usesStructuredClient() async throws {
+        let checkIn = DailyCheckIn(
+            sleepQuality: .poor,
+            fatigueLevel: .high,
+            moodLevel: .low,
+            sorenessLevel: .strong,
+            availableMinutes: 10,
+            motivationLevel: .low
+        )
+        let goal = UserGoal(goalType: .strength, title: "ベンチプレス100kg", targetMetric: "100kg", priority: 1)
+
+        await planner.generateDailyRecommendation(checkIn: checkIn, goal: goal, recentLogs: [], activePlan: nil)
+
+        let prompt = try XCTUnwrap(mockClient.lastDailyRecommendationPrompt)
+        XCTAssertTrue(prompt.contains("睡眠: 悪い"))
+        XCTAssertTrue(prompt.contains("疲労: 重い"))
+        XCTAssertTrue(prompt.contains("目標タイプ: 筋力アップ"))
+        XCTAssertEqual(planner.dailyRecommendationOutput?.title, "Test Recommendation")
+        XCTAssertNil(planner.errorMessage)
     }
 }

@@ -142,6 +142,48 @@
 - 目標タイプ別の最小条件（筋肥大/調整=メニュー2件以上、減量=600秒以上、リフレッシュ=180秒以上、その他=メニュー1件以上）を満たした場合のみ保存する。
 - メニュー選択のみでセット詳細が未入力の場合、`TrainingExercise`は`bodyPart=.other`、`category=.strength`、`sets=[]`で作成する。
 
+## Daily Check-In / Recommendationモデル
+
+毎日の意思決定はTrainingLogとは分けて保存する。TrainingLogは実行結果、DailyCheckInは実行前の状態、DailyRecommendationは今日の処方箋を表す。
+
+### DailyCheckIn
+
+| フィールド | 型 | 必須 | 内容 |
+| --- | --- | --- | --- |
+| id | UUID | 必須 | チェックイン一意ID |
+| date | Date | 必須 | 対象日 |
+| sleepQuality | SleepQuality | 必須 | `poor` / `normal` / `good` |
+| fatigueLevel | FatigueLevel | 必須 | `high` / `normal` / `low` |
+| moodLevel | MoodLevel | 必須 | `low` / `normal` / `high` |
+| sorenessLevel | SorenessLevel | 必須 | `none` / `mild` / `strong` |
+| availableMinutes | Int | 必須 | 10 / 30 / 60以上を基本 |
+| motivationLevel | MotivationLevel | 必須 | `low` / `normal` / `high` |
+| note | String | 任意 | 補足メモ |
+
+### DailyRecommendation
+
+| フィールド | 型 | 必須 | 内容 |
+| --- | --- | --- | --- |
+| id | UUID | 必須 | 提案一意ID |
+| date | Date | 必須 | 対象日 |
+| readinessLevel | ReadinessLevel | 必須 | `go` / `easy` / `rest` |
+| recommendationType | RecommendationType | 必須 | `fullWorkout` / `lightWorkout` / `recovery` / `rest` / `consultation` |
+| title | String | 必須 | 今日の提案タイトル |
+| summary | String | 必須 | ホームカード本文 |
+| reasons | [String] | 必須 | 提案理由。AI提案でもルール提案でも必須 |
+| plannedExercises | [PlannedExercise] | 必須 | 今日のメニュー。休養日も回復行動を含む |
+| alternatives | [AlternativePlan] | 必須 | 通常、短縮、回復、休養などの選択肢 |
+| recoveryAdvice | [String] | 必須 | 安全・回復・継続の助言 |
+| generatedAt | Date | 必須 | 生成日時 |
+| acceptedAction | AcceptedAction | 任意 | ユーザーが選んだ行動 |
+
+### AI構造化出力
+
+Foundation Modelsを使う場合は、自由文ではなく `@Generable` / `@Guide` で定義した構造化出力を生成する。
+UIに必要な `readinessLevel`、`recommendationType`、`title`、`summary`、`reasons`、`exercises`、`alternatives`、`recoveryAdvice` を必ず含める。
+
+AIが利用できない場合は、`DailyRecommendationGenerator.decideReadiness(checkIn:)` のルールベース判定で同じデータ構造を生成する。
+
 
 ### V1でUIから入力させる項目
 
