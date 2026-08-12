@@ -69,4 +69,11 @@
 - テスト・quickstart の実行結果など検証記録が残っている。
 
 <!-- MANUAL ADDITIONS START -->
+## Foundation Models 利用ルール
+
+- Foundation Models からアプリ状態へ保存・表示する出力は、原則として `@Generable` / `@Guide` による構造化出力にする。UI表示用の本文を `String` 自由文だけで受け取らない。
+- `@Guide` には件数、数値範囲、禁止事項（Markdown禁止、休養時のメニュー空配列など）を具体的に書く。
+- 生成結果は Domain の出力DTOへ変換し、Validator または Mapper を通してから SwiftData モデルや View に渡す。
+- Foundation Models が使えない、または構造検証に失敗した場合は、ユーザー体験を止めずルールベースの代替を返す。
+- Markdown 風テキストが既存データとして残っている場合でも、そのまま `Text` に流さず表示専用パーサや View コンポーネントで整形する。
 <!-- MANUAL ADDITIONS END -->

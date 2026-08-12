@@ -38,6 +38,60 @@ private enum FoundationRecommendationTypeContent {
 }
 
 @available(iOS 26.0, macOS 26.0, *)
+@Generable(description: "プランの時間軸。目標、現在フェーズ、今週、今日のいずれか。")
+private enum FoundationPlanHorizonContent {
+    case longTerm
+    case midTerm
+    case shortTerm
+    case general
+
+    var domainValue: PlanHorizon {
+        switch self {
+        case .longTerm: return .longTerm
+        case .midTerm: return .midTerm
+        case .shortTerm: return .shortTerm
+        case .general: return .general
+        }
+    }
+}
+
+@available(iOS 26.0, macOS 26.0, *)
+@Generable(description: "UIに保存・表示する構造化プラン提案。Markdownを含めず、項目名と内容を分けて扱える形にする。")
+private struct FoundationPlanSuggestionContent {
+    @Guide(description: "プラン名。例: 目標、今のフェーズ、今週の作戦、今日やること。Markdown記号を含めない。")
+    var title: String
+
+    @Guide(description: "カードに表示する短い要約。1文で、Markdown記号を含めない。")
+    var summary: String
+
+    @Guide(description: "プランの時間軸。")
+    var horizon: FoundationPlanHorizonContent
+
+    @Guide(description: "詳細。Markdownを使わず、「項目名: 内容」を改行区切りにする。曜日はMonday/Tuesdayのようにキー化する。")
+    var detail: String
+
+    var domainValue: PlanSuggestionOutput {
+        PlanSuggestionOutput(
+            title: title,
+            summary: summary,
+            horizon: horizon.domainValue.rawValue,
+            detail: detail
+        )
+    }
+}
+
+@available(iOS 26.0, macOS 26.0, *)
+@Generable(description: "長期プラン生成の構造化出力。ユーザーが選べる複数の完全なプラン候補を返す。")
+private struct FoundationPlanSuggestionsContent {
+    @Guide(description: "ユーザーがアクティブプランとして選べる2〜3件の候補。各候補はGoal、Phase、Week、Today相当の情報をdetailに含める。", .count(2...3))
+    var plans: [FoundationPlanSuggestionContent]
+
+    var domainValue: PlanSuggestionsOutput {
+        PlanSuggestionsOutput(plans: plans.map(\.domainValue))
+    }
+}
+
+@available(iOS 26.0, macOS 26.0, *)
 @Generable(description: "予定種目の分類。筋トレ、有酸素、モビリティ、その他のいずれか。")
 private enum FoundationExerciseCategoryContent {
     case strength
@@ -118,7 +172,7 @@ private struct FoundationAlternativePlanContent {
 }
 
 @available(iOS 26.0, macOS 26.0, *)
-@Generable(description: "今日の処方箋としてUIに保存・表示する構造化提案。必ず理由、メニュー、代替案、回復アドバイスを含める。")
+@Generable(description: "今日の処方箋としてUIに保存・表示する構造化提案。必ず理由、代替案、回復アドバイスを含める。")
 private struct FoundationDailyRecommendationContent {
     @Guide(description: "今日の状態判定。go/easy/restの3段階。")
     var readinessLevel: FoundationReadinessLevelContent
@@ -135,7 +189,7 @@ private struct FoundationDailyRecommendationContent {
     @Guide(description: "ユーザーが納得できる提案理由。チェックイン、目的、最近の記録に基づく。", .count(3...6))
     var reasons: [String]
 
-    @Guide(description: "今日のおすすめメニュー。休養日でも散歩、ストレッチ、明日の確認などの回復行動を含める。", .count(1...5))
+    @Guide(description: "今日のおすすめメニュー。fullWorkout/lightWorkoutでは1件以上。restでは空にする。", .count(0...5))
     var exercises: [FoundationPlannedExerciseContent]
 
     @Guide(description: "ユーザーが選べる代替案。短縮版、回復メニュー、休養、相談などを含める。", .count(3...4))
@@ -181,7 +235,7 @@ struct LiveFoundationModelClient: FoundationModelClientProtocol {
 
     init(systemModelProvider: @escaping () -> SystemLanguageModel = { SystemLanguageModel.default }) {
         self.systemModelProvider = systemModelProvider
-        self.instructions = Instructions("あなたはパーソナルコンディションコーチです。ユーザーの体調、気分、目的、最近の記録をもとに、運動する・軽く動く・休むを安全に判断してください。休養も計画の一部として扱い、提案には必ず理由と代替案を含めてください。")
+        self.instructions = Instructions("あなたはパーソナルコンディションコーチです。ユーザーの体調、気分、目的、最近の記録をもとに、運動する・軽く動く・休むを安全に判断してください。休養も計画の一部として扱い、提案には必ず理由と代替案を含めてください。restの場合、予定メニューは空にし、回復行動はrecoveryAdviceに書いてください。")
     }
 
     func generateTodaySuggestion(prompt: String) async throws -> String {
@@ -196,27 +250,34 @@ struct LiveFoundationModelClient: FoundationModelClientProtocol {
         }
     }
 
-    func generatePlan(prompt: String) async throws -> String {
+    func generatePlan(prompt: String) async throws -> PlanSuggestionsOutput {
         let session = try makeSessionIfNeeded()
 
         let longTermPrompt = """
-        以下の情報に基づき、Goal（目標）/ Phase（今のフェーズ）/ Week（今週の作戦）/ Today（今日やること）の観点でトレーニングプランを提案してください。
+        以下の情報に基づき、ユーザーがアクティブプランとして選べる複数のトレーニングプラン候補を提案してください。
 
         # 依頼内容
         \(prompt)
 
         # 出力要件
-        - Goal／Phase／Week／Todayのセクションを含める
+        - Foundation Modelsの構造化出力に従う
+        - plans配列に2〜3件の候補プランを含める
+        - 各候補は単独でアクティブプランとして採用できる完全な内容にする
+        - title / summary / detail にMarkdown、コードフェンス、説明文、装飾記号を含めない
         - 週あたりの頻度と主なフォーカス部位を明示する
         - ボリュームや負荷は現実的な範囲で段階的に増やす
         - 休養や軽めの日も計画の一部として明示する
-        - 箇条書きで簡潔に
+        - detailはUIが扱いやすいように「項目名: 内容」を改行区切りにする
+        - detailには目標、方針、曜日ごとの作戦、休養方針、今日の最小アクションを含める
         """
 
         let structuredPrompt = Prompt(longTermPrompt)
         do {
-            let generation = try await session.respond(to: structuredPrompt)
-            return generation.content
+            let generation = try await session.respond(
+                to: structuredPrompt,
+                generating: FoundationPlanSuggestionsContent.self
+            )
+            return generation.content.domainValue
         } catch {
             throw FoundationModelError.generationFailed(error)
         }
@@ -317,7 +378,7 @@ enum FoundationModelError: Error {
 
 /// 26.0未満のOSではApple Intelligenceが利用できないため、明示的にエラーを返すクライアント
 class UnavailableFoundationModelClient: FoundationModelClientProtocol {
-    func generatePlan(prompt: String) async throws -> String {
+    func generatePlan(prompt: String) async throws -> PlanSuggestionsOutput {
         throw FoundationModelError.unavailable(.deviceNotEligible)
     }
 

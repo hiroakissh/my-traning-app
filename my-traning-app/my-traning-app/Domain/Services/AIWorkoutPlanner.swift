@@ -3,6 +3,7 @@ import Foundation
 @MainActor // UIの更新を伴う可能性があるため、メインスレッドで動作させる
 class AIWorkoutPlanner: ObservableObject {
     private let foundationModelClient: FoundationModelClientProtocol
+    private let planGenerationService: PlanGenerationService
     private let calendar: Calendar
     
     // 長期プラン用
@@ -12,6 +13,7 @@ class AIWorkoutPlanner: ObservableObject {
     // 今日の提案用
     @Published var todaySuggestion: String = ""
     @Published var dailyRecommendationOutput: DailyRecommendationOutput?
+    @Published var dailyRecommendation: DailyRecommendation?
     
     @Published var isLoading: Bool = false
     @Published var errorMessage: String? = nil
@@ -19,9 +21,17 @@ class AIWorkoutPlanner: ObservableObject {
     // DI (依存性注入) を可能にするイニシャライザ
     init(
         foundationModelClient: FoundationModelClientProtocol = FoundationModelClientFactory.make(),
+        planGenerationService: PlanGenerationService? = nil,
         calendar: Calendar = .current
     ) {
         self.foundationModelClient = foundationModelClient
+        self.planGenerationService = planGenerationService ?? PlanGenerationCoordinator(
+            aiService: AIPlanGenerationService(
+                foundationModelClient: foundationModelClient,
+                calendar: calendar
+            ),
+            fallbackService: RuleBasedPlanGenerationService()
+        )
         self.calendar = calendar
     }
     
@@ -30,17 +40,54 @@ class AIWorkoutPlanner: ObservableObject {
         errorMessage = nil
         generatedPlan = ""
         planSuggestions = []
+
+        guard userProfile.isComplete else {
+            errorMessage = userProfile.validationMessage ?? "プロフィールを入力してからプランを生成してください。"
+            isLoading = false
+            return
+        }
         
         // ユーザー情報からプロンプトを生成
         let prompt = """
-        以下のユーザー情報と目標に基づいて、最適なトレーニングプランを提案してください。
-        マークダウンを使わず、プレーンテキストのみで回答してください。箇条書きはハイフン区切りで構いません。
+        以下のユーザー情報と目標に基づいて、ユーザーがアクティブプランとして選べる複数のトレーニングプラン候補を提案してください。
+        回答はJSONのみで返してください。Markdown、コードフェンス、装飾記号、説明文は含めないでください。
+
+        # JSON形式
+        {
+          "plans": [
+            {
+              "title": "筋力アップ標準プラン",
+              "summary": "この候補の要約",
+              "horizon": "longTerm",
+              "detail": "目標: ...\\n方針: ...\\nMonday: ...\\nWednesday: ...\\nFriday: ...\\n休養: ...\\n今日やること: ..."
+            },
+            {
+              "title": "短時間集中プラン",
+              "summary": "この候補の要約",
+              "horizon": "midTerm",
+              "detail": "目標: ...\\n方針: ...\\nMonday: ...\\nWednesday: ...\\nFriday: ...\\n休養: ...\\n今日やること: ..."
+            },
+            {
+              "title": "回復優先プラン",
+              "summary": "この候補の要約",
+              "horizon": "shortTerm",
+              "detail": "目標: ...\\n方針: ...\\nMonday: ...\\nWednesday: ...\\nFriday: ...\\n休養: ...\\n今日やること: ..."
+            }
+          ]
+        }
+
+        # 生成ルール
+        - plans は2〜3件
+        - 各 plans の1件が、単独でアクティブプランとして採用できる完全な候補
+        - Goal / Phase / Week / Today を別カードに分割しない
+        - detail は「項目名: 内容」の改行区切り
+        - 休養や軽めの日も計画の一部として含める
 
         # ユーザー情報
-        - 年齢: \(userProfile.age)歳
-        - 性別: \(userProfile.gender)
-        - 身長: \(userProfile.height)cm
-        - 体重: \(userProfile.weight)kg
+        - 年齢: \(userProfile.agePrompt)
+        - 性別: \(userProfile.genderPrompt)
+        - 身長: \(userProfile.heightPrompt)
+        - 体重: \(userProfile.weightPrompt)
 
         # 目標
         \(goal)
@@ -48,7 +95,7 @@ class AIWorkoutPlanner: ObservableObject {
         
         do {
             let plan = try await foundationModelClient.generatePlan(prompt: prompt)
-            self.generatedPlan = plan
+            self.generatedPlan = plan.jsonString
             self.planSuggestions = PlanSuggestionMapper.map(from: plan, prompt: prompt)
         } catch {
             self.errorMessage = mapError(error)
@@ -68,18 +115,24 @@ class AIWorkoutPlanner: ObservableObject {
         isLoading = true
         errorMessage = nil
         dailyRecommendationOutput = nil
+        dailyRecommendation = nil
 
         do {
-            let prompt = buildDailyRecommendationPrompt(
+            let recommendation = try await planGenerationService.generateDailyRecommendation(
                 checkIn: checkIn,
                 goal: goal,
                 recentLogs: recentLogs,
-                activePlan: activePlan
+                currentPlan: activePlan
             )
-            dailyRecommendationOutput = try await foundationModelClient.generateDailyRecommendation(prompt: prompt)
+            dailyRecommendation = recommendation
+            dailyRecommendationOutput = DailyRecommendationOutput(recommendation: recommendation)
+            if recommendation.generationSource == .ruleBased {
+                errorMessage = recommendation.generationNotice
+            }
         } catch {
             errorMessage = mapError(error)
             dailyRecommendationOutput = nil
+            dailyRecommendation = nil
         }
 
         isLoading = false
@@ -157,7 +210,8 @@ class AIWorkoutPlanner: ObservableObject {
         guard let plan else { return [] }
         return [
             "- アクティブプラン: \(plan.title)",
-            "- 概要: \(plan.summary)"
+            "- 概要: \(plan.summary)",
+            "- 詳細: \(plan.detail)"
         ]
     }
 
@@ -188,66 +242,6 @@ class AIWorkoutPlanner: ObservableObject {
         return lines
     }
 
-    private func buildDailyRecommendationPrompt(
-        checkIn: DailyCheckIn,
-        goal: UserGoal?,
-        recentLogs: [TrainingLog],
-        activePlan: ActivePlan?
-    ) -> String {
-        let goalLines = makeGoalLines(from: goal)
-        let planLines = makePlanLines(from: activePlan)
-        let recentLogLines = makeRecentLogLines(from: recentLogs)
-
-        let contextLines = (goalLines + planLines + recentLogLines)
-        let contextSummary = contextLines.isEmpty
-            ? "- 目標や過去記録はまだ少ないため、継続しやすさと安全性を優先する。"
-            : contextLines.joined(separator: "\n")
-
-        return """
-        今日の体調チェックイン、目的、最近の記録から、今日の処方箋を日本語で生成してください。
-        自由文チャットではなく、UIに保存・表示する構造化出力として、指定された型の各フィールドを必ず埋めてください。
-
-        # 判断方針
-        - readinessLevelはgo/easy/restの3段階で返す
-        - restまたはrecoveryも通常の成功行動として扱う
-        - reasonsには、チェックイン値・目的・過去記録に基づく納得できる理由を3件以上含める
-        - exercisesには、休養日でも散歩、ストレッチ、水分補給、明日の確認などの回復行動を含める
-        - alternativesには、通常/短縮/回復/休養/相談の中から選択肢を3件以上含める
-        - 高強度を無理に勧めず、痛みや強い疲労がある場合は回復を優先する
-
-        # 今日のチェックイン
-        - 睡眠: \(checkIn.sleepQuality.displayName)
-        - 疲労: \(checkIn.fatigueLevel.displayName)
-        - 気分: \(checkIn.moodLevel.displayName)
-        - 筋肉痛: \(checkIn.sorenessLevel.displayName)
-        - 使える時間: \(checkIn.availableMinutes)分
-        - やる気: \(checkIn.motivationLevel.displayName)
-        - メモ: \(checkIn.note?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? checkIn.note! : "なし")
-
-        # 目的・記録
-        \(contextSummary)
-        """
-    }
-
-    private func makeGoalLines(from goal: UserGoal?) -> [String] {
-        guard let goal else { return [] }
-
-        var lines = [
-            "- 目標タイプ: \(goal.goalType.displayName)",
-            "- 目標: \(goal.title)",
-            "- 提案方針: \(goal.goalType.policySummary)"
-        ]
-
-        if let targetMetric = goal.targetMetric, !targetMetric.isEmpty {
-            lines.append("- 目標指標: \(targetMetric)")
-        }
-        if let targetDate = goal.targetDate {
-            lines.append("- 期限: \(targetDate.formatted(date: .abbreviated, time: .omitted))")
-        }
-
-        return lines
-    }
-
     private func makeRecentLogLines(from logs: [TrainingLog]) -> [String] {
         guard logs.isEmpty == false else { return [] }
 
@@ -272,14 +266,6 @@ class AIWorkoutPlanner: ObservableObject {
 
         return lines
     }
-}
-
-// ダミーのユーザープロフィール（本来は永続化されたデータを使用）
-struct UserProfile {
-    let age: Int
-    let gender: String
-    let height: Int
-    let weight: Int
 }
 
 struct AIAssistantContext {

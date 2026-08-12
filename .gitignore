@@ -7,3 +7,6 @@
 
 # Local CLI build artifacts
 build/
+
+# Codex local environment profiles
+.codex/environments/

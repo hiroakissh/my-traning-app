@@ -3,7 +3,14 @@ import XCTest
 
 // テスト専用のモッククライアント
 class MockFoundationModelClientForTest: FoundationModelClientProtocol {
-    var planResponse = "Test Plan"
+    var planResponse = PlanSuggestionsOutput(plans: [
+        PlanSuggestionOutput(
+            title: "Test Plan",
+            summary: "Test Summary",
+            horizon: "general",
+            detail: "内容: Test Plan"
+        )
+    ])
     var suggestionResponse = "Test Suggestion"
     var dailyRecommendationResponse = DailyRecommendationOutput(
         readinessLevel: .easy,
@@ -11,8 +18,21 @@ class MockFoundationModelClientForTest: FoundationModelClientProtocol {
         title: "Test Recommendation",
         summary: "Test Summary",
         reasons: ["Reason 1", "Reason 2", "Reason 3"],
-        exercises: [],
-        alternatives: [],
+        exercises: [
+            PlannedExerciseOutput(
+                name: "Test Exercise",
+                detail: "Test Detail",
+                targetSets: 2,
+                targetReps: 8,
+                weightDescription: "light",
+                estimatedMinutes: 10,
+                category: .strength
+            )
+        ],
+        alternatives: [
+            AlternativePlanOutput(title: "Short", description: "Short plan", estimatedMinutes: 10, intensity: 2),
+            AlternativePlanOutput(title: "Rest", description: "Rest plan", estimatedMinutes: 0, intensity: 1)
+        ],
         recoveryAdvice: ["Advice 1", "Advice 2"]
     )
     var errorToThrow: Error?
@@ -20,7 +40,7 @@ class MockFoundationModelClientForTest: FoundationModelClientProtocol {
     var lastSuggestionPrompt: String?
     var lastDailyRecommendationPrompt: String?
 
-    func generatePlan(prompt: String) async throws -> String {
+    func generatePlan(prompt: String) async throws -> PlanSuggestionsOutput {
         lastPlanPrompt = prompt
         if let errorToThrow {
             throw errorToThrow
@@ -68,7 +88,14 @@ final class AIWorkoutPlannerTests: XCTestCase {
 
     func test_createPlan_success() async {
         // Given
-        let expectedPlan = "Test Plan"
+        let expectedPlan = PlanSuggestionsOutput(plans: [
+            PlanSuggestionOutput(
+                title: "Test Plan",
+                summary: "Structured summary",
+                horizon: "shortTerm",
+                detail: "Monday: ベンチプレス\n休養: 水曜は軽め"
+            )
+        ])
         mockClient.planResponse = expectedPlan
 
         // When
@@ -77,9 +104,10 @@ final class AIWorkoutPlannerTests: XCTestCase {
         // Then
         XCTAssertFalse(planner.isLoading, "isLoading should be false after completion")
         XCTAssertNil(planner.errorMessage, "errorMessage should be nil on success")
-        XCTAssertEqual(planner.generatedPlan, expectedPlan, "generatedPlan should match the mock response")
+        XCTAssertEqual(planner.generatedPlan, expectedPlan.jsonString, "generatedPlan should preserve the structured response")
         XCTAssertEqual(planner.planSuggestions.count, 1)
-        XCTAssertEqual(planner.planSuggestions.first?.detail, expectedPlan)
+        XCTAssertEqual(planner.planSuggestions.first?.detail, "Monday: ベンチプレス\n休養: 水曜は軽め")
+        XCTAssertEqual(planner.planSuggestions.first?.horizon, .shortTerm)
     }
 
     func test_createPlan_failure() async {
@@ -147,6 +175,10 @@ final class AIWorkoutPlannerTests: XCTestCase {
         XCTAssertTrue(prompt.contains("身長: 175cm"))
         XCTAssertTrue(prompt.contains("体重: 70kg"))
         XCTAssertTrue(prompt.contains("筋力アップ"))
+        XCTAssertTrue(prompt.contains("回答はJSONのみ"))
+        XCTAssertTrue(prompt.contains("Markdown"))
+        XCTAssertTrue(prompt.contains("アクティブプランとして選べる"))
+        XCTAssertTrue(prompt.contains("Goal / Phase / Week / Today を別カードに分割しない"))
     }
 
     func test_suggestTodayWorkout_failure() async {
@@ -264,6 +296,7 @@ final class AIWorkoutPlannerTests: XCTestCase {
         XCTAssertTrue(prompt.contains("平均心拍数: 128 bpm"))
         XCTAssertTrue(prompt.contains("肩が張っているので軽めにしたい"))
         XCTAssertTrue(prompt.contains("アクティブプラン"))
+        XCTAssertTrue(prompt.contains("週3回のプッシュメインセッション"))
     }
 
     func test_generateDailyRecommendation_usesStructuredClient() async throws {

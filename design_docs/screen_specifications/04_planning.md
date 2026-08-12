@@ -18,9 +18,11 @@ AIによって生成された計画と、ユーザーの目的を確認・管理
     -   連続記録よりも週単位の継続と計画遵守率を重視する。
 -   **Today連携:**
     -   ホームのTodayRecommendationCardと接続し、今日の判断に反映する。
--   **プラン一覧（最新の提案）:**
-    -   Goal / Phase / Week / Today の観点で提案を整理する。
-    -   各プランの概要（目標、期間）を表示し、「このプランを採用」アクションでアクティブプランを更新する。
+    -   `WeeklyReview` と直近の `TrainingLog.planDeltaSummary` を次回の `DailyRecommendation` 生成に渡す。
+-   **プラン候補一覧（最新の提案）:**
+    -   AIが2〜3件の完全なプラン候補を提示する。
+    -   各候補は、Goal / Phase / Week / Today 相当の情報を内包し、単独でアクティブプランとして採用できる。
+    -   各候補の概要（目標、期間、曜日ごとの作戦、休養方針）を表示し、「アクティブプランにする」アクションでアクティブプランを更新する。
 -   **プラン詳細ビュー（プランアイテムタップ時）:**
     -   選択したプランの具体的な目標設定（例：ベンチプレス100kg達成）。
     -   プランの全期間にわたるトレーニングスケジュールのカレンダーまたはリスト表示。
@@ -32,7 +34,7 @@ AIによって生成された計画と、ユーザーの目的を確認・管理
 ## 4.3. 機能要件
 
 -   **プラン表示:**
-    -   `Domain/Services/AIWorkoutPlanner`から最新の`PlanSuggestion`を取得し、長期/中期/短期のセクションで表示する。
+    -   `Domain/Services/AIWorkoutPlanner`から最新の`PlanSuggestion`候補を取得し、選択可能な候補カードとして表示する。
     -   `SwiftData`に保存された最新の`ActivePlan`をカード表示する。
 -   **目的別提案:**
     -   `UserGoal.goalType`をもとに、race / strength / diet / health / mentalRecovery / habit の提案方針を切り替える。
@@ -48,15 +50,48 @@ AIによって生成された計画と、ユーザーの目的を確認・管理
     -   「プランを再生成」ボタンをタップすると、AIに新しいプランの生成をリクエストする。
     -   リクエスト時に、追加の要望（例：「もう少し脚のトレーニングを増やしたい」）を入力できるオプションも設ける。
     -   新しいプランが生成されたら、表示を更新する。
+-   **今日の提案生成:**
+    -   日次提案は `PlanGenerationService` 経由で行い、画面やViewModelに生成ロジックを直書きしない。
+    -   `AIPlanGenerationService` はFoundation Modelsの構造化出力を使う。
+    -   `DailyRecommendationValidator` で検証し、不正な場合は1回だけ再生成する。
+    -   失敗時は `RuleBasedPlanGenerationService` が安全なメニューを返す。
 -   **目標の編集:**
     -   ユーザーが手動で目標値を変更した場合、それに応じてプラン全体が調整されるか、再生成を促すメッセージを表示する。
  -   **採用フロー:**
-    -   最新提案から「このプランを採用」を選択すると、`ActivePlan`として保存し、アクティブプランカードを更新する。
+    -   最新提案から「アクティブプランにする」を選択すると、`ActivePlan`として保存し、アクティブプランカードを更新する。
     -   再提案後も以前のアクティブプランカードは保持し、比較できる状態を維持する。
+    -   `ActivePlan` は日次提案生成とAI相談のコンテキストに渡し、提案理由・今日のメニュー・軽め/休養判断に反映する。
 
 ## 4.4. データ要件
 
--   `WorkoutPlan` (Domain/Models): AIによって生成されたすべてのトレーニングプラン。
+-   `WorkoutPlan` / `ActivePlan` (Domain/Models): AIによって生成・採用されたトレーニングプラン。
 -   `UserProfile` (Domain/Models): ユーザーの身体情報や長期的な目標など、プラン生成の基礎となるデータ。
 -   `UserGoal` (Domain/Models): 目的タイプ、タイトル、期限、指標、優先度。
 -   `WeeklyReview` (Domain/Models): 週単位の実行率、休養日数、課題、来週の作戦。
+
+## 4.5. WeeklyReview連携
+
+WeeklyReviewは、単なる集計ではなく次回提案の入力として扱う。
+
+生成タイミング:
+
+- 週の終わりに自動生成
+- ユーザーが「今週の振り返り」を開いたときに生成
+
+集計対象:
+
+- `TrainingLog`
+- `DailyCheckIn`
+- `DailyRecommendation`
+- `ActivityResult`
+- RPE
+- planned vs actual の差分
+
+次回提案に反映する観点:
+
+- 予定が重すぎる
+- 休養が不足している
+- 睡眠不足の日に失敗しやすい
+- 特定部位の疲労が残りやすい
+- 使える時間に対してメニューが長すぎる
+- 週後半に継続率が落ちる

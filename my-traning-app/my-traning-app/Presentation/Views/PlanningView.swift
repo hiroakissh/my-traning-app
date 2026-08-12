@@ -13,6 +13,12 @@ struct PlanningView: View {
 
     @State private var goalText: String = ""
     @State private var selectedPurpose: TrainingPurpose = .hypertrophy
+    @State private var userProfile: UserProfile = .empty
+    @State private var ageText: String = ""
+    @State private var genderText: String = ""
+    @State private var heightText: String = ""
+    @State private var weightText: String = ""
+    @State private var profileMessage: String?
 
     private var activePlan: ActivePlan? { savedPlans.first }
 
@@ -27,6 +33,7 @@ struct PlanningView: View {
                     }
 
                     goalInput
+                    profileSection
                     purposeChips
                     suggestedSection
 
@@ -62,13 +69,15 @@ struct PlanningView: View {
             // triggerPlanGenerationがtrueになったら非同期タスクを実行
             .task(id: triggerPlanGeneration) {
                 if triggerPlanGeneration {
-                    let dummyProfile = UserProfile(age: 30, gender: "男性", height: 175, weight: 70)
                     let prompt = buildGoalPrompt()
-                    await planner.createPlan(userProfile: dummyProfile, goal: prompt)
+                    await planner.createPlan(userProfile: userProfile, goal: prompt)
                     
                     // トリガーをリセット
                     triggerPlanGeneration = false
                 }
+            }
+            .task {
+                loadUserProfile()
             }
             .alert("プラン保存に失敗しました", isPresented: Binding(get: { persistenceError != nil }, set: { _ in persistenceError = nil })) {
                 Button("OK", role: .cancel) {}
@@ -115,6 +124,56 @@ struct PlanningView: View {
                     .stroke(AppColors.strokeGlow, lineWidth: 1)
             )
         }
+    }
+
+    private var profileSection: some View {
+        HudSectionCard(title: "プロフィール", subtitle: "プラン生成に使う情報") {
+            VStack(alignment: .leading, spacing: AppLayout.grid * 1.2) {
+                HStack(spacing: AppLayout.grid) {
+                    profileField("年齢", text: $ageText, suffix: "歳")
+                    profileField("身長", text: $heightText, suffix: "cm")
+                    profileField("体重", text: $weightText, suffix: "kg")
+                }
+
+                Picker("性別", selection: $genderText) {
+                    Text("選択してください").tag("")
+                    Text("女性").tag("女性")
+                    Text("男性").tag("男性")
+                    Text("その他・回答しない").tag("その他・回答しない")
+                }
+                .pickerStyle(.menu)
+                .tint(AppColors.primary)
+
+                HStack {
+                    if let profileMessage {
+                        Text(profileMessage)
+                            .font(AppTypography.label(12))
+                            .foregroundColor(profileMessage == "プロフィールを保存しました。" ? AppColors.secondary : .orange)
+                    }
+                    Spacer()
+                    Button("保存") {
+                        saveUserProfile()
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(AppColors.primary)
+                }
+            }
+        }
+    }
+
+    private func profileField(_ title: String, text: Binding<String>, suffix: String) -> some View {
+        HStack(spacing: AppLayout.grid * 0.4) {
+            TextField(title, text: text)
+                .keyboardType(.numberPad)
+                .multilineTextAlignment(.trailing)
+            Text(suffix)
+                .font(AppTypography.label(12, weight: .semibold))
+                .foregroundColor(AppColors.textSecondary)
+        }
+        .padding(.horizontal, AppLayout.grid)
+        .padding(.vertical, AppLayout.grid * 0.9)
+        .background(AppColors.surface2.opacity(0.9))
+        .clipShape(RoundedRectangle(cornerRadius: AppLayout.cardRadius, style: .continuous))
     }
 
     private var purposeChips: some View {
@@ -178,12 +237,8 @@ struct PlanningView: View {
                     .padding(.vertical, AppLayout.grid)
             } else {
                 VStack(spacing: AppLayout.grid * 1.5) {
-                    ForEach(Array(planner.planSuggestions.enumerated()), id: \.element.id) { index, suggestion in
-                        if index == 0 {
-                            descriptionCard(suggestion)
-                        } else {
-                            suggestionCard(suggestion)
-                        }
+                    ForEach(planner.planSuggestions) { suggestion in
+                        suggestionCard(suggestion)
                     }
                 }
             }
@@ -194,7 +249,9 @@ struct PlanningView: View {
         VStack(alignment: .leading, spacing: AppLayout.grid * 1.2) {
             HStack(spacing: AppLayout.grid) {
                 pill(text: suggestion.horizon.displayName.uppercased())
-                if Calendar.current.isDateInToday(suggestion.createdAt) {
+                if isActivePlan(suggestion) {
+                    pill(text: "選択中", secondary: false)
+                } else if Calendar.current.isDateInToday(suggestion.createdAt) {
                     pill(text: "RECOMMENDED", secondary: true)
                 }
             }
@@ -203,10 +260,7 @@ struct PlanningView: View {
                 .font(AppTypography.body(18, weight: .semibold))
                 .foregroundColor(AppColors.textPrimary)
 
-            Text(suggestion.detail)
-                .font(AppTypography.body(14))
-                .foregroundColor(AppColors.textSecondary)
-                .lineLimit(4)
+            PlanDetailContentView(detail: suggestion.detail, mode: .compact(maxItems: 3))
 
             HStack(spacing: AppLayout.grid) {
                 metricChip(title: "頻度", value: frequencyText(from: suggestion.detail) ?? "調整可", systemImage: "calendar")
@@ -214,13 +268,13 @@ struct PlanningView: View {
             }
 
             Button(action: { adoptPlan(from: suggestion) }) {
-                Text("プランを採用 →")
+                Text(isActivePlan(suggestion) ? "アクティブプラン" : "アクティブプランにする →")
                     .font(AppTypography.body(16, weight: .semibold))
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .tint(AppColors.primary)
-            .disabled(planner.isLoading)
+            .disabled(planner.isLoading || isActivePlan(suggestion))
         }
         .padding(AppLayout.grid * 2)
         .glassCardStyle()
@@ -294,10 +348,7 @@ struct PlanningView: View {
                 .font(AppTypography.label())
                 .foregroundColor(AppColors.textSecondary)
                 .lineLimit(3)
-            Text(plan.detail)
-                .font(AppTypography.label())
-                .foregroundColor(AppColors.textSecondary)
-                .lineLimit(5)
+            PlanDetailContentView(detail: plan.detail, mode: .compact(maxItems: 4))
 
             HStack(spacing: AppLayout.grid) {
                 Button {
@@ -310,14 +361,16 @@ struct PlanningView: View {
                 .buttonStyle(.bordered)
                 .tint(AppColors.primary)
 
-                NavigationLink(destination: EmptyView()) {
-                    Label("プランを変更", systemImage: "square.and.pencil")
+                Button {
+                    triggerPlanGeneration = true
+                } label: {
+                    Label("別プランを提案", systemImage: "square.grid.2x2")
                         .font(AppTypography.body(15, weight: .semibold))
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
                 .tint(AppColors.textSecondary)
-                .disabled(true) // 実装プレースホルダー
+                .disabled(planner.isLoading)
             }
         }
         .padding(AppLayout.grid * 2)
@@ -363,10 +416,7 @@ struct PlanningView: View {
             Text("プラン概要")
                 .font(AppTypography.body(15, weight: .semibold))
                 .foregroundColor(AppColors.textPrimary)
-            Text(plan.detail)
-                .font(AppTypography.body(14))
-                .foregroundColor(AppColors.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
+            PlanDetailContentView(detail: plan.detail)
 
             Button {
                 triggerPlanGeneration = true
@@ -389,14 +439,16 @@ struct PlanningView: View {
                 .buttonStyle(.bordered)
                 .tint(AppColors.secondary)
 
-                NavigationLink(destination: EmptyView()) {
-                    Label("プランを変更", systemImage: "square.and.pencil")
+                Button {
+                    triggerPlanGeneration = true
+                } label: {
+                    Label("別プランを提案", systemImage: "square.grid.2x2")
                         .font(AppTypography.body(15, weight: .semibold))
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
                 .tint(AppColors.textSecondary)
-                .disabled(true) // プレースホルダー
+                .disabled(planner.isLoading)
             }
         }
         .padding(AppLayout.grid * 2)
@@ -419,10 +471,48 @@ struct PlanningView: View {
         }
     }
 
+    private func isActivePlan(_ suggestion: PlanSuggestion) -> Bool {
+        guard let activePlan else { return false }
+        return activePlan.title == suggestion.title
+            && activePlan.summary == suggestion.summary
+            && activePlan.detail == suggestion.detail
+    }
+
     private func buildGoalPrompt() -> String {
         let trimmed = goalText.trimmingCharacters(in: .whitespacesAndNewlines)
         let goal = trimmed.isEmpty ? "3ヶ月で筋力アップを目指す" : trimmed
         return "目的: \(selectedPurpose.displayName)\n目標: \(goal)"
+    }
+
+    private func loadUserProfile() {
+        let profile = UserProfileStore.load()
+        userProfile = profile
+        ageText = profile.age.map(String.init) ?? ""
+        genderText = profile.gender ?? ""
+        heightText = profile.height.map(String.init) ?? ""
+        weightText = profile.weight.map(String.init) ?? ""
+    }
+
+    private func saveUserProfile() {
+        let profile = UserProfile(
+            age: Int(ageText),
+            gender: genderText.isEmpty ? nil : genderText,
+            height: Int(heightText),
+            weight: Int(weightText)
+        )
+
+        guard profile.isComplete else {
+            profileMessage = profile.validationMessage ?? "プロフィールを確認してください。"
+            return
+        }
+
+        do {
+            try UserProfileStore.save(profile)
+            userProfile = profile
+            profileMessage = "プロフィールを保存しました。"
+        } catch {
+            profileMessage = "プロフィールの保存に失敗しました。"
+        }
     }
 
     private func frequencyText(from text: String) -> String? {
@@ -438,25 +528,6 @@ struct PlanningView: View {
         if text.contains("中強度") { return "中強度" }
         if text.contains("低強度") { return "低強度" }
         return nil
-    }
-
-    private func descriptionCard(_ suggestion: PlanSuggestion) -> some View {
-        VStack(alignment: .leading, spacing: AppLayout.grid) {
-            HStack {
-                pill(text: "ACTIVE PLAN", secondary: true)
-                Spacer()
-                pill(text: suggestion.horizon.displayName.uppercased(), secondary: true)
-            }
-            Text(suggestion.title)
-                .font(AppTypography.body(18, weight: .semibold))
-                .foregroundColor(AppColors.textPrimary)
-            Text(suggestion.detail)
-                .font(AppTypography.body(14))
-                .foregroundColor(AppColors.textSecondary)
-                .lineLimit(nil)
-        }
-        .padding(AppLayout.grid * 2)
-        .glassCardStyle()
     }
 
     private func planProgressRate(for plan: ActivePlan) -> Double {

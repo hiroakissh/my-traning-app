@@ -1,6 +1,10 @@
 import Foundation
 
 enum PlanSuggestionMapper {
+    static func map(from output: PlanSuggestionsOutput, prompt: String, date: Date = Date()) -> [PlanSuggestion] {
+        mapPayloads(output.plans, prompt: prompt, date: date, raw: output.jsonString)
+    }
+
     static func map(from response: String, prompt: String, date: Date = Date()) -> [PlanSuggestion] {
         // 1. JSON形式 (推奨) を優先してパース
         if let jsonSuggestions = decodeJSONSuggestions(from: response, prompt: prompt, date: date), jsonSuggestions.isEmpty == false {
@@ -21,7 +25,7 @@ enum PlanSuggestionMapper {
                 id: UUID(),
                 horizon: PlanHorizon.fromTitle(title),
                 title: title,
-                summary: summary,
+                summary: cleanMarkdownLine(summary),
                 detail: detail,
                 rawText: response,
                 sourcePrompt: prompt,
@@ -47,10 +51,10 @@ enum PlanSuggestionMapper {
                 } else if !currentBody.isEmpty {
                     sections.append(("プラン", currentBody))
                 }
-                currentTitle = trimmed.replacingOccurrences(of: "^#+\\s*", with: "", options: .regularExpression)
+                currentTitle = cleanMarkdownLine(trimmed.replacingOccurrences(of: "^#+\\s*", with: "", options: .regularExpression))
                 currentBody = []
             } else if !trimmed.isEmpty {
-                currentBody.append(trimmed)
+                currentBody.append(cleanMarkdownLine(trimmed))
             }
         }
 
@@ -65,50 +69,71 @@ enum PlanSuggestionMapper {
 
     // MARK: - JSON parser (推奨形式)
 
-    private struct PlanSuggestionPayload: Decodable {
-        let title: String
-        let summary: String?
-        let detail: String?
-        let horizon: String?
-    }
-
-    private struct PlanSuggestionsEnvelope: Decodable {
-        let plans: [PlanSuggestionPayload]
-    }
-
     private static func decodeJSONSuggestions(from response: String, prompt: String, date: Date) -> [PlanSuggestion]? {
-        let data = Data(response.utf8)
+        guard let json = extractJSONPayload(from: response) else { return nil }
+        let data = Data(json.utf8)
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
 
         // パターン1: 配列ルート
-        if let payloads = try? decoder.decode([PlanSuggestionPayload].self, from: data) {
+        if let payloads = try? decoder.decode([PlanSuggestionOutput].self, from: data) {
             return mapPayloads(payloads, prompt: prompt, date: date, raw: response)
         }
         // パターン2: { "plans": [...] }
-        if let envelope = try? decoder.decode(PlanSuggestionsEnvelope.self, from: data) {
+        if let envelope = try? decoder.decode(PlanSuggestionsOutput.self, from: data) {
             return mapPayloads(envelope.plans, prompt: prompt, date: date, raw: response)
         }
 
         return nil
     }
 
-    private static func mapPayloads(_ payloads: [PlanSuggestionPayload], prompt: String, date: Date, raw: String) -> [PlanSuggestion] {
+    private static func mapPayloads(_ payloads: [PlanSuggestionOutput], prompt: String, date: Date, raw: String) -> [PlanSuggestion] {
         payloads.enumerated().map { index, item in
             let title = item.title.isEmpty ? "プラン" : item.title
-            let horizon = PlanHorizon(rawValue: item.horizon ?? "") ?? PlanHorizon.fromTitle(title)
-            let detailText = item.detail ?? item.summary ?? title
+            let horizon = PlanHorizon(rawValue: item.horizon) ?? PlanHorizon.fromTitle(title)
+            let detailText = item.detail.isEmpty ? item.summary : item.detail
 
             return PlanSuggestion(
                 id: UUID(),
                 horizon: horizon,
-                title: title,
-                summary: item.summary ?? title,
+                title: cleanMarkdownLine(title),
+                summary: cleanMarkdownLine(item.summary.isEmpty ? title : item.summary),
                 detail: detailText,
                 rawText: raw,
                 sourcePrompt: prompt,
                 createdAt: date.addingTimeInterval(TimeInterval(index))
             )
         }
+    }
+
+    private static func extractJSONPayload(from response: String) -> String? {
+        let trimmed = response.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.hasPrefix("{") || trimmed.hasPrefix("[") {
+            return trimmed
+        }
+
+        if let firstObject = trimmed.firstIndex(of: "{"),
+           let lastObject = trimmed.lastIndex(of: "}"),
+           firstObject < lastObject {
+            return String(trimmed[firstObject...lastObject])
+        }
+
+        if let firstArray = trimmed.firstIndex(of: "["),
+           let lastArray = trimmed.lastIndex(of: "]"),
+           firstArray < lastArray {
+            return String(trimmed[firstArray...lastArray])
+        }
+
+        return nil
+    }
+
+    private static func cleanMarkdownLine(_ value: String) -> String {
+        var line = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        line = line.replacingOccurrences(of: "^[-*•]+\\s*", with: "", options: .regularExpression)
+        line = line.replacingOccurrences(of: "**", with: "")
+        line = line.replacingOccurrences(of: "__", with: "")
+        line = line.replacingOccurrences(of: "`", with: "")
+        line = line.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+        return line.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

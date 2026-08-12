@@ -2,39 +2,37 @@ import Foundation
 
 // Foundation Model APIクライアントの振る舞いを定義するプロトコル
 protocol FoundationModelClientProtocol {
-    func generatePlan(prompt: String) async throws -> String
+    func generatePlan(prompt: String) async throws -> PlanSuggestionsOutput
     func generateTodaySuggestion(prompt: String) async throws -> String
     func generateDailyRecommendation(prompt: String) async throws -> DailyRecommendationOutput
 }
 
 // 開発・テスト用のモッククライアント
 class MockFoundationModelClient: FoundationModelClientProtocol {
-    func generatePlan(prompt: String) async throws -> String {
+    func generatePlan(prompt: String) async throws -> PlanSuggestionsOutput {
         // 実際のAPI通信を模倣するために2秒待つ
         try await Task.sleep(nanoseconds: 2_000_000_000)
-        
-        // ダミーのプラン提案を返す
-        let dummyPlan = """
-        ## 新しいトレーニングプラン
 
-        ### Goal（目標）
-        - **目標:** 全体的な筋力向上と体力アップ
-        - **フォーカス:** 主要な複合関節運動の重量を15%向上させる
-
-        ### Phase（今のフェーズ）
-        - **方針:** 筋肥大トレーニング (週4日)
-        - **内容:** 胸・背中・脚・肩腕の分割法
-
-        ### Week（今週の作戦）
-        - **月:** 胸の日 (ベンチプレス中心)
-        - **火:** 脚の日 (スクワット中心)
-        - **水:** 休息
-        - **木:** 背中の日 (デッドリフト、懸垂)
-        - **金:** 肩・腕の日
-        - **土日:** 休息または軽い有酸素運動
-        """
-        
-        return dummyPlan
+        return PlanSuggestionsOutput(plans: [
+            PlanSuggestionOutput(
+                title: "筋力アップ標準プラン",
+                summary: "週4日の分割トレーニングで主要種目を伸ばします。",
+                horizon: "longTerm",
+                detail: "目標: 主要な複合関節運動の重量を15%向上させる\n方針: 胸・背中・脚・肩腕の分割法\nMonday: 胸の日 (ベンチプレス中心)\nTuesday: 脚の日 (スクワット中心)\nThursday: 背中の日 (デッドリフト、懸垂)\nFriday: 肩・腕の日\n休養: 水曜と週末は回復を優先"
+            ),
+            PlanSuggestionOutput(
+                title: "短時間集中プラン",
+                summary: "忙しい週でも主種目だけは継続します。",
+                horizon: "midTerm",
+                detail: "目標: 週3回でベンチプレスとスクワットを維持向上\n方針: 各回30分以内で主種目を優先\nMonday: ベンチプレスとロー\nWednesday: スクワットと体幹\nFriday: 肩・腕を短時間\n休養: 火木土日は散歩かストレッチ"
+            ),
+            PlanSuggestionOutput(
+                title: "回復優先プラン",
+                summary: "疲労を残しすぎず、軽めの日を計画に含めます。",
+                horizon: "shortTerm",
+                detail: "目標: 継続を止めずに疲労を抜く\n方針: RPE 6〜7を上限にフォーム確認を重視\nMonday: 上半身ライト\nWednesday: 下半身ライト\nFriday: 全身サーキット\n休養: 火木土日はストレッチと散歩"
+            )
+        ])
     }
     
     func generateTodaySuggestion(prompt: String) async throws -> String {
@@ -64,10 +62,7 @@ class MockFoundationModelClient: FoundationModelClientProtocol {
                     "強い筋肉痛がある場合は高負荷を避けます。",
                     "休養も計画遵守の一部として記録します。"
                 ],
-                exercises: [
-                    PlannedExerciseOutput(name: "10分の散歩", detail: "息が上がらない範囲で歩く", targetSets: nil, targetReps: nil, weightDescription: nil, estimatedMinutes: 10, category: .cardio),
-                    PlannedExerciseOutput(name: "股関節ストレッチ", detail: "痛みのない範囲でほぐす", targetSets: 2, targetReps: nil, weightDescription: nil, estimatedMinutes: 5, category: .mobility)
-                ],
+                exercises: [],
                 alternatives: [
                     AlternativePlanOutput(title: "完全休養", description: "運動せず睡眠と食事を整える", estimatedMinutes: 0, intensity: 1),
                     AlternativePlanOutput(title: "散歩だけ", description: "10分だけ外に出る", estimatedMinutes: 10, intensity: 1),

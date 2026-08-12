@@ -3,11 +3,14 @@ import SwiftData
 
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var watchConnectivity: WatchConnectivityService
     @StateObject private var planner = AIWorkoutPlanner()
     @StateObject private var dashboardViewModel = HomeDashboardViewModel()
+    private let lifecycle = WorkoutSessionLifecycleService()
 
     @State private var aiQuery: String = ""
     @State private var triggerSuggestion = false
+    @State private var recommendationStatusMessage: String?
 
     @Query(sort: \ActivePlan.adoptedAt, order: .reverse) private var savedPlans: [ActivePlan]
     @Query(sort: \TrainingLog.date, order: .reverse) private var trainingLogs: [TrainingLog]
@@ -57,6 +60,11 @@ struct HomeView: View {
                 #endif
             }
             .task { await dashboardViewModel.refreshHealthData() }
+            .task(id: todayRecommendation?.id) {
+                if let todayRecommendation {
+                    watchConnectivity.sendRecommendation(todayRecommendation)
+                }
+            }
             .task(id: triggerSuggestion) {
                 if triggerSuggestion {
                     let context = dashboardViewModel.makeAssistantContext(
@@ -125,6 +133,13 @@ struct HomeView: View {
                     .foregroundColor(AppColors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
 
+                if let notice = recommendation.generationNotice {
+                    Label(notice, systemImage: "shield.lefthalf.filled")
+                        .font(AppTypography.label())
+                        .foregroundColor(AppColors.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
                 VStack(alignment: .leading, spacing: AppLayout.grid * 0.7) {
                     Text("理由")
                         .font(AppTypography.label(12, weight: .semibold))
@@ -169,7 +184,7 @@ struct HomeView: View {
 
                     HStack(spacing: AppLayout.grid) {
                         if recommendation.recommendationType != .rest {
-                            NavigationLink(destination: RecordingView()) {
+                            NavigationLink(destination: WorkoutSessionView(recommendation: recommendation)) {
                                 Label("開始", systemImage: "play.fill")
                                     .font(AppTypography.body(15, weight: .semibold))
                                     .frame(maxWidth: .infinity)
@@ -181,13 +196,21 @@ struct HomeView: View {
                             })
                         }
 
-                        Button(action: { accept(.changedToRest, for: recommendation) }) {
+                        Button(action: { recordRest(for: recommendation) }) {
                             Label("休む", systemImage: "moon.zzz.fill")
                                 .font(AppTypography.body(15, weight: .semibold))
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.bordered)
                         .tint(AppColors.textSecondary)
+                        .disabled(hasRestLog(for: recommendation))
+                    }
+
+                    if let recommendationStatusMessage {
+                        Text(recommendationStatusMessage)
+                            .font(AppTypography.label())
+                            .foregroundColor(AppColors.textSecondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
             }
@@ -368,10 +391,7 @@ struct HomeView: View {
                         .font(AppTypography.label(13))
                         .foregroundColor(AppColors.textSecondary)
                         .lineLimit(2)
-                    Text(activePlan.detail)
-                        .font(AppTypography.label(12))
-                        .foregroundColor(AppColors.textSecondary)
-                        .lineLimit(3)
+                    PlanDetailContentView(detail: activePlan.detail, mode: .compact(maxItems: 3))
                 }
             } else {
                 Text("まだプランが設定されていません。プランタブからAIに再提案を依頼してください。")
@@ -467,6 +487,34 @@ struct HomeView: View {
             assertionFailure("Failed to save accepted action: \(error.localizedDescription)")
         }
     }
+
+    private func recordRest(for recommendation: DailyRecommendation) {
+        guard !hasRestLog(for: recommendation) else {
+            recommendationStatusMessage = "休養はすでに記録済みです。"
+            return
+        }
+
+        recommendation.acceptedAction = .changedToRest
+        let log = lifecycle.makeRestedLog(
+            from: recommendation,
+            note: "休養も計画の一部として記録",
+            changedToRest: recommendation.recommendationType != .rest
+        )
+        modelContext.insert(log)
+
+        do {
+            try modelContext.save()
+            recommendationStatusMessage = "休養として記録しました。"
+        } catch {
+            recommendationStatusMessage = "保存に失敗しました。"
+        }
+    }
+
+    private func hasRestLog(for recommendation: DailyRecommendation) -> Bool {
+        trainingLogs.contains {
+            $0.recommendationId == recommendation.id && $0.activityResult == .rested
+        }
+    }
 }
 
 private struct CircularGoalView: View {
@@ -541,11 +589,16 @@ private struct MetricCard: View {
                 DailyRecommendation.self,
                 PlannedExercise.self,
                 AlternativePlan.self,
+                WorkoutSession.self,
+                WorkoutSessionExercise.self,
+                PlannedSet.self,
+                ActualSet.self,
                 UserGoal.self,
                 WeeklyReview.self
             ] as [any PersistentModel.Type],
             inMemory: true
         )
+        .environmentObject(WatchConnectivityService())
 }
 
 private extension View {

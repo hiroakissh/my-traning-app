@@ -24,7 +24,6 @@ struct DailyCheckInView: View {
     @State private var persistenceError: String?
 
     private let minuteOptions = [10, 30, 60]
-    private let generator = DailyRecommendationGenerator()
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
@@ -190,15 +189,10 @@ struct DailyCheckInView: View {
             activePlan: savedPlans.first
         )
 
-        let recommendation = if let output = planner.dailyRecommendationOutput {
-            output.makeModel(date: today)
-        } else {
-            generator.generate(
-                checkIn: checkIn,
-                goal: goals.sorted { $0.priority > $1.priority }.first,
-                recentLogs: trainingLogs,
-                activePlan: savedPlans.first
-            )
+        guard let recommendation = planner.dailyRecommendation else {
+            modelContext.delete(checkIn)
+            persistenceError = "今日は詳細な提案を保存できませんでした。時間を置いて再度お試しください。"
+            return
         }
         modelContext.insert(recommendation)
 
@@ -296,6 +290,10 @@ private struct ChoiceItem: Identifiable {
             DailyRecommendation.self,
             PlannedExercise.self,
             AlternativePlan.self,
+            WorkoutSession.self,
+            WorkoutSessionExercise.self,
+            PlannedSet.self,
+            ActualSet.self,
             UserGoal.self,
             WeeklyReview.self
         ] as [any PersistentModel.Type],

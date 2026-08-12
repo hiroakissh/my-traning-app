@@ -45,6 +45,27 @@ struct PlanSuggestion: Identifiable, Codable, Equatable {
     let createdAt: Date
 }
 
+struct PlanSuggestionOutput: Codable, Equatable {
+    let title: String
+    let summary: String
+    let horizon: String
+    let detail: String
+}
+
+struct PlanSuggestionsOutput: Codable, Equatable {
+    let plans: [PlanSuggestionOutput]
+
+    var jsonString: String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        guard let data = try? encoder.encode(self),
+              let string = String(data: data, encoding: .utf8) else {
+            return ""
+        }
+        return string
+    }
+}
+
 @Model
 final class ActivePlan {
     @Attribute(.unique) var id: UUID

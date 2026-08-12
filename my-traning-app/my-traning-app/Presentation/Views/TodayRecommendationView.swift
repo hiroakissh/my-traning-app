@@ -4,15 +4,25 @@ import SwiftData
 struct TodayRecommendationView: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var recommendation: DailyRecommendation
+    @Query(sort: \TrainingLog.date, order: .reverse) private var trainingLogs: [TrainingLog]
+    private let lifecycle = WorkoutSessionLifecycleService()
+
+    @State private var statusMessage: String?
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: AppLayout.grid * 2) {
                 header
+                if let notice = recommendation.generationNotice {
+                    noticeSection(notice)
+                }
                 reasonsSection
                 menuSection
                 recoverySection
                 actionsSection
+                if let statusMessage {
+                    statusBanner(statusMessage)
+                }
             }
             .padding(.horizontal, AppLayout.grid * 2)
             .padding(.vertical, AppLayout.grid * 2.5)
@@ -62,8 +72,14 @@ struct TodayRecommendationView: View {
 
     private var menuSection: some View {
         HudSectionCard(title: "メニュー", subtitle: nil, spacing: AppLayout.grid) {
-            VStack(spacing: AppLayout.grid) {
-                ForEach(sortedExercises) { exercise in
+            if sortedExercises.isEmpty {
+                Text("今日は予定セットなしです。休養や回復行動を計画の一部として記録できます。")
+                    .font(AppTypography.body(14))
+                    .foregroundColor(AppColors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                VStack(spacing: AppLayout.grid) {
+                    ForEach(sortedExercises) { exercise in
                     HStack(alignment: .top, spacing: AppLayout.grid) {
                         Text("\(exercise.order)")
                             .font(AppTypography.label(12, weight: .semibold))
@@ -98,6 +114,7 @@ struct TodayRecommendationView: View {
                     .padding(AppLayout.grid * 1.2)
                     .background(AppColors.surface2.opacity(0.75))
                     .clipShape(RoundedRectangle(cornerRadius: AppLayout.grid, style: .continuous))
+                    }
                 }
             }
         }
@@ -120,7 +137,7 @@ struct TodayRecommendationView: View {
         HudSectionCard(title: "選択肢", subtitle: nil, spacing: AppLayout.grid) {
             VStack(spacing: AppLayout.grid) {
                 if recommendation.recommendationType != .rest {
-                    NavigationLink(destination: RecordingView()) {
+                    NavigationLink(destination: WorkoutSessionView(recommendation: recommendation)) {
                         Label("このメニューで開始", systemImage: "play.fill")
                             .font(AppTypography.body(16, weight: .semibold))
                             .frame(maxWidth: .infinity)
@@ -130,6 +147,15 @@ struct TodayRecommendationView: View {
                     .simultaneousGesture(TapGesture().onEnded {
                         accept(.startedOriginalPlan)
                     })
+                } else {
+                    Button(action: { recordRest(action: .changedToRest) }) {
+                        Label("この内容で休養を記録", systemImage: "moon.zzz.fill")
+                            .font(AppTypography.body(16, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(AppColors.primary)
+                    .disabled(hasRestLog)
                 }
 
                 ForEach(recommendation.alternatives) { alternative in
@@ -159,13 +185,14 @@ struct TodayRecommendationView: View {
                     .buttonStyle(.plain)
                 }
 
-                Button(action: { accept(.changedToRest) }) {
+                Button(action: { recordRest(action: .changedToRest) }) {
                     Label("今日は休養日にする", systemImage: "moon.zzz.fill")
                         .font(AppTypography.body(15, weight: .semibold))
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
                 .tint(AppColors.textSecondary)
+                .disabled(hasRestLog)
             }
         }
     }
@@ -192,12 +219,68 @@ struct TodayRecommendationView: View {
         return Text(parts.joined(separator: " / "))
     }
 
+    private func noticeSection(_ message: String) -> some View {
+        HStack(alignment: .top, spacing: AppLayout.grid) {
+            Image(systemName: "shield.lefthalf.filled")
+                .foregroundColor(AppColors.secondary)
+            Text(message)
+                .font(AppTypography.body(14))
+                .foregroundColor(AppColors.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(AppLayout.grid * 1.25)
+        .background(AppColors.surface2.opacity(0.9))
+        .clipShape(RoundedRectangle(cornerRadius: AppLayout.grid, style: .continuous))
+    }
+
+    private func statusBanner(_ message: String) -> some View {
+        HStack(alignment: .top, spacing: AppLayout.grid) {
+            Image(systemName: "checkmark.seal.fill")
+                .foregroundColor(AppColors.primary)
+            Text(message)
+                .font(AppTypography.body(14))
+                .foregroundColor(AppColors.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(AppLayout.grid * 1.25)
+        .background(AppColors.surface2.opacity(0.9))
+        .clipShape(RoundedRectangle(cornerRadius: AppLayout.grid, style: .continuous))
+    }
+
     private func accept(_ action: AcceptedAction) {
         recommendation.acceptedAction = action
         do {
             try modelContext.save()
         } catch {
             assertionFailure("Failed to save accepted action: \(error.localizedDescription)")
+        }
+    }
+
+    private func recordRest(action: AcceptedAction) {
+        guard !hasRestLog else {
+            statusMessage = "休養はすでに記録済みです。"
+            return
+        }
+
+        recommendation.acceptedAction = action
+        let log = lifecycle.makeRestedLog(
+            from: recommendation,
+            note: "休養も計画の一部として記録",
+            changedToRest: action == .changedToRest
+        )
+        modelContext.insert(log)
+
+        do {
+            try modelContext.save()
+            statusMessage = "休養として記録しました。"
+        } catch {
+            statusMessage = "保存に失敗しました: \(error.localizedDescription)"
+        }
+    }
+
+    private var hasRestLog: Bool {
+        trainingLogs.contains {
+            $0.recommendationId == recommendation.id && $0.activityResult == .rested
         }
     }
 
@@ -251,6 +334,10 @@ struct TodayRecommendationView: View {
             DailyRecommendation.self,
             PlannedExercise.self,
             AlternativePlan.self,
+            WorkoutSession.self,
+            WorkoutSessionExercise.self,
+            PlannedSet.self,
+            ActualSet.self,
             TrainingLog.self,
             TrainingExercise.self,
             TrainingSet.self,

@@ -74,10 +74,10 @@ struct RecordingView: View {
     // MARK: Header
     private var header: some View {
         VStack(alignment: .leading, spacing: AppLayout.grid * 0.5) {
-            Text("ワークアウト設定")
+            Text("手動記録")
                 .font(AppTypography.title(26))
                 .foregroundColor(AppColors.textPrimary)
-            Text("種目と目標を選んで記録を開始")
+            Text("提案メニュー以外を残すための補助記録")
                 .font(AppTypography.label())
                 .foregroundColor(AppColors.textSecondary)
         }

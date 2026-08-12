@@ -50,4 +50,46 @@ final class PlanSuggestionMapperTests: XCTestCase {
         XCTAssertEqual(result.count, 1)
         XCTAssertEqual(result.first?.title, "長期プラン")
     }
+
+    func test_map_createsSuggestionsFromStructuredOutput() {
+        let output = PlanSuggestionsOutput(plans: [
+            PlanSuggestionOutput(
+                title: "今週の作戦",
+                summary: "曜日ごとに進める",
+                horizon: "shortTerm",
+                detail: "Monday: 胸\n休養: 水曜は軽め"
+            )
+        ])
+
+        let result = PlanSuggestionMapper.map(from: output, prompt: "prompt")
+
+        XCTAssertEqual(result.count, 1)
+        XCTAssertEqual(result.first?.horizon, .shortTerm)
+        XCTAssertEqual(result.first?.title, "今週の作戦")
+        XCTAssertEqual(result.first?.summary, "曜日ごとに進める")
+        XCTAssertEqual(result.first?.detail, "Monday: 胸\n休養: 水曜は軽め")
+    }
+
+    func test_planDisplayContent_parsesMarkdownLikePlanIntoUISections() {
+        let detail = """
+        * **Monday:** 胸・背中
+        * **Wednesday:** 腕・肩
+        * **ボリューム:** 各セット3〜5回
+        * **負荷:** 1〜2週間ごとに増やす
+        * **休養:**
+        * **Tuesday:** 軽いストレッチ
+        * **RecoveryAdvice:**
+        * **筋肉痛:**
+        * **Rest:** 軽いウォーキング
+        """
+
+        let content = PlanDisplayContent.parse(detail)
+
+        XCTAssertEqual(content.scheduleItems.map(\.day), ["月", "水"])
+        XCTAssertEqual(content.scheduleItems.first?.detail, "胸・背中")
+        XCTAssertEqual(content.infoItems.map(\.title), ["ボリューム", "負荷"])
+        XCTAssertTrue(content.recoveryItems.contains("火: 軽いストレッチ"))
+        XCTAssertTrue(content.recoveryItems.contains("休養: 軽いウォーキング"))
+        XCTAssertFalse(content.recoveryItems.contains { $0.contains("**") || $0.contains("*") })
+    }
 }
