@@ -4,6 +4,7 @@ import SwiftData
 struct TodayRecommendationView: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var recommendation: DailyRecommendation
+    @Query(sort: \TrainingLog.date, order: .reverse) private var trainingLogs: [TrainingLog]
     private let lifecycle = WorkoutSessionLifecycleService()
 
     @State private var statusMessage: String?
@@ -154,6 +155,7 @@ struct TodayRecommendationView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(AppColors.primary)
+                    .disabled(hasRestLog)
                 }
 
                 ForEach(recommendation.alternatives) { alternative in
@@ -190,6 +192,7 @@ struct TodayRecommendationView: View {
                 }
                 .buttonStyle(.bordered)
                 .tint(AppColors.textSecondary)
+                .disabled(hasRestLog)
             }
         }
     }
@@ -254,6 +257,11 @@ struct TodayRecommendationView: View {
     }
 
     private func recordRest(action: AcceptedAction) {
+        guard !hasRestLog else {
+            statusMessage = "休養はすでに記録済みです。"
+            return
+        }
+
         recommendation.acceptedAction = action
         let log = lifecycle.makeRestedLog(
             from: recommendation,
@@ -267,6 +275,12 @@ struct TodayRecommendationView: View {
             statusMessage = "休養として記録しました。"
         } catch {
             statusMessage = "保存に失敗しました: \(error.localizedDescription)"
+        }
+    }
+
+    private var hasRestLog: Bool {
+        trainingLogs.contains {
+            $0.recommendationId == recommendation.id && $0.activityResult == .rested
         }
     }
 

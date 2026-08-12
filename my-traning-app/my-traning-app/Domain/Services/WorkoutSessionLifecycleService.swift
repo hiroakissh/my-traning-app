@@ -28,10 +28,11 @@ struct WorkoutSessionLifecycleService {
     func makeTrainingLog(
         from session: WorkoutSession,
         recommendation: DailyRecommendation?,
-        endedAt: Date = Date()
+        endedAt: Date = Date(),
+        activeDurationSec: Int? = nil
     ) -> TrainingLog {
         let endTime = session.endedAt ?? endedAt
-        let duration = max(Int(endTime.timeIntervalSince(session.startedAt)), 0)
+        let duration = max(activeDurationSec ?? Int(endTime.timeIntervalSince(session.startedAt)), 0)
         let result = activityResult(for: session, recommendation: recommendation)
         let executedExercises = session.exercises
             .sorted { $0.order < $1.order }
@@ -163,19 +164,16 @@ struct WorkoutSessionLifecycleService {
         for session: WorkoutSession,
         recommendation: DailyRecommendation?
     ) -> ActivityResult {
-        if recommendation?.recommendationType == .recovery {
-            return .recoveryCompleted
-        }
-
         switch session.status {
         case .completed:
-            return .completed
+            return recommendation?.recommendationType == .recovery ? .recoveryCompleted : .completed
         case .partiallyCompleted:
-            return .partiallyCompleted
+            return recommendation?.recommendationType == .recovery ? .recoveryCompleted : .partiallyCompleted
         case .cancelled, .notStarted:
             return .skipped
         case .inProgress:
-            return hasExecutedSet(session) ? .partiallyCompleted : .skipped
+            guard hasExecutedSet(session) else { return .skipped }
+            return recommendation?.recommendationType == .recovery ? .recoveryCompleted : .partiallyCompleted
         }
     }
 

@@ -303,7 +303,12 @@ struct WorkoutSessionView: View {
         updateSessionStatus(forFinish: true)
         session.endedAt = finalizedTimer.endTime ?? Date()
 
-        let log = lifecycle.makeTrainingLog(from: session, recommendation: recommendation, endedAt: session.endedAt ?? Date())
+        let log = lifecycle.makeTrainingLog(
+            from: session,
+            recommendation: recommendation,
+            endedAt: session.endedAt ?? Date(),
+            activeDurationSec: finalizedTimer.elapsedSeconds
+        )
         modelContext.insert(log)
 
         do {

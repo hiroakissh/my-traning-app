@@ -2,6 +2,9 @@ import SwiftUI
 import SwiftData
 
 struct MainView: View {
+    @EnvironmentObject private var watchConnectivity: WatchConnectivityService
+    @Environment(\.modelContext) private var modelContext
+
     var body: some View {
         TabView {
             HomeView()
@@ -27,6 +30,12 @@ struct MainView: View {
         .hudBackground()
         .tint(AppColors.primary)
         .applyHudTabBarChrome()
+        .task {
+            watchConnectivity.processPendingEvents(using: modelContext)
+        }
+        .onChange(of: watchConnectivity.eventRevision) { _, _ in
+            watchConnectivity.processPendingEvents(using: modelContext)
+        }
     }
 }
 
@@ -52,6 +61,7 @@ struct MainView: View {
             ] as [any PersistentModel.Type],
             inMemory: true
         )
+        .environmentObject(WatchConnectivityService())
 }
 
 private extension View {

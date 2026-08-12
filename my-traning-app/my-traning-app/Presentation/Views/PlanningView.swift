@@ -13,6 +13,12 @@ struct PlanningView: View {
 
     @State private var goalText: String = ""
     @State private var selectedPurpose: TrainingPurpose = .hypertrophy
+    @State private var userProfile: UserProfile = .empty
+    @State private var ageText: String = ""
+    @State private var genderText: String = ""
+    @State private var heightText: String = ""
+    @State private var weightText: String = ""
+    @State private var profileMessage: String?
 
     private var activePlan: ActivePlan? { savedPlans.first }
 
@@ -27,6 +33,7 @@ struct PlanningView: View {
                     }
 
                     goalInput
+                    profileSection
                     purposeChips
                     suggestedSection
 
@@ -62,13 +69,15 @@ struct PlanningView: View {
             // triggerPlanGenerationがtrueになったら非同期タスクを実行
             .task(id: triggerPlanGeneration) {
                 if triggerPlanGeneration {
-                    let dummyProfile = UserProfile(age: 30, gender: "男性", height: 175, weight: 70)
                     let prompt = buildGoalPrompt()
-                    await planner.createPlan(userProfile: dummyProfile, goal: prompt)
+                    await planner.createPlan(userProfile: userProfile, goal: prompt)
                     
                     // トリガーをリセット
                     triggerPlanGeneration = false
                 }
+            }
+            .task {
+                loadUserProfile()
             }
             .alert("プラン保存に失敗しました", isPresented: Binding(get: { persistenceError != nil }, set: { _ in persistenceError = nil })) {
                 Button("OK", role: .cancel) {}
@@ -115,6 +124,56 @@ struct PlanningView: View {
                     .stroke(AppColors.strokeGlow, lineWidth: 1)
             )
         }
+    }
+
+    private var profileSection: some View {
+        HudSectionCard(title: "プロフィール", subtitle: "プラン生成に使う情報") {
+            VStack(alignment: .leading, spacing: AppLayout.grid * 1.2) {
+                HStack(spacing: AppLayout.grid) {
+                    profileField("年齢", text: $ageText, suffix: "歳")
+                    profileField("身長", text: $heightText, suffix: "cm")
+                    profileField("体重", text: $weightText, suffix: "kg")
+                }
+
+                Picker("性別", selection: $genderText) {
+                    Text("選択してください").tag("")
+                    Text("女性").tag("女性")
+                    Text("男性").tag("男性")
+                    Text("その他・回答しない").tag("その他・回答しない")
+                }
+                .pickerStyle(.menu)
+                .tint(AppColors.primary)
+
+                HStack {
+                    if let profileMessage {
+                        Text(profileMessage)
+                            .font(AppTypography.label(12))
+                            .foregroundColor(profileMessage == "プロフィールを保存しました。" ? AppColors.secondary : .orange)
+                    }
+                    Spacer()
+                    Button("保存") {
+                        saveUserProfile()
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(AppColors.primary)
+                }
+            }
+        }
+    }
+
+    private func profileField(_ title: String, text: Binding<String>, suffix: String) -> some View {
+        HStack(spacing: AppLayout.grid * 0.4) {
+            TextField(title, text: text)
+                .keyboardType(.numberPad)
+                .multilineTextAlignment(.trailing)
+            Text(suffix)
+                .font(AppTypography.label(12, weight: .semibold))
+                .foregroundColor(AppColors.textSecondary)
+        }
+        .padding(.horizontal, AppLayout.grid)
+        .padding(.vertical, AppLayout.grid * 0.9)
+        .background(AppColors.surface2.opacity(0.9))
+        .clipShape(RoundedRectangle(cornerRadius: AppLayout.cardRadius, style: .continuous))
     }
 
     private var purposeChips: some View {
@@ -423,6 +482,37 @@ struct PlanningView: View {
         let trimmed = goalText.trimmingCharacters(in: .whitespacesAndNewlines)
         let goal = trimmed.isEmpty ? "3ヶ月で筋力アップを目指す" : trimmed
         return "目的: \(selectedPurpose.displayName)\n目標: \(goal)"
+    }
+
+    private func loadUserProfile() {
+        let profile = UserProfileStore.load()
+        userProfile = profile
+        ageText = profile.age.map(String.init) ?? ""
+        genderText = profile.gender ?? ""
+        heightText = profile.height.map(String.init) ?? ""
+        weightText = profile.weight.map(String.init) ?? ""
+    }
+
+    private func saveUserProfile() {
+        let profile = UserProfile(
+            age: Int(ageText),
+            gender: genderText.isEmpty ? nil : genderText,
+            height: Int(heightText),
+            weight: Int(weightText)
+        )
+
+        guard profile.isComplete else {
+            profileMessage = profile.validationMessage ?? "プロフィールを確認してください。"
+            return
+        }
+
+        do {
+            try UserProfileStore.save(profile)
+            userProfile = profile
+            profileMessage = "プロフィールを保存しました。"
+        } catch {
+            profileMessage = "プロフィールの保存に失敗しました。"
+        }
     }
 
     private func frequencyText(from text: String) -> String? {

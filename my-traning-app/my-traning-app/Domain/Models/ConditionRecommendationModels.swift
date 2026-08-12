@@ -370,7 +370,7 @@ final class DailyRecommendation {
     var recoveryAdviceStorage: String
     var generatedAt: Date
     var acceptedActionRaw: String?
-    var generationSourceRaw: String
+    var generationSourceRaw: String = RecommendationGenerationSource.ai.rawValue
     var generationNotice: String?
 
     var readinessLevel: ReadinessLevel {

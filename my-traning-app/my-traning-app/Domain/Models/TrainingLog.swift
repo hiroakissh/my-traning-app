@@ -157,7 +157,7 @@ final class TrainingLog: Identifiable {
     var sessionDurationSec: Int
     var purpose: TrainingPurpose
     var source: TrainingLogSource
-    var activityResultRaw: String
+    var activityResultRaw: String = ActivityResult.completed.rawValue
     var condition: TrainingCondition?
     @Relationship(deleteRule: .cascade) var exercises: [TrainingExercise]
     @Transient var strengthExercises: [StrengthExerciseLog] = []
@@ -165,11 +165,11 @@ final class TrainingLog: Identifiable {
     @Transient var healthSnapshot: HealthDataSnapshot?
     var averageRPE: Double?
     var note: String?
-    var createdAt: Date
-    var wasPlanned: Bool
-    var wasShortened: Bool
-    var hadSkippedItems: Bool
-    var changedToRest: Bool
+    var createdAt: Date = Date()
+    var wasPlanned: Bool = false
+    var wasShortened: Bool = false
+    var hadSkippedItems: Bool = false
+    var changedToRest: Bool = false
     var planDeltaSummary: String?
 
     // エイリアス（設計ドキュメントのフィールド名に合わせる）

@@ -40,6 +40,12 @@ class AIWorkoutPlanner: ObservableObject {
         errorMessage = nil
         generatedPlan = ""
         planSuggestions = []
+
+        guard userProfile.isComplete else {
+            errorMessage = userProfile.validationMessage ?? "プロフィールを入力してからプランを生成してください。"
+            isLoading = false
+            return
+        }
         
         // ユーザー情報からプロンプトを生成
         let prompt = """
@@ -78,10 +84,10 @@ class AIWorkoutPlanner: ObservableObject {
         - 休養や軽めの日も計画の一部として含める
 
         # ユーザー情報
-        - 年齢: \(userProfile.age)歳
-        - 性別: \(userProfile.gender)
-        - 身長: \(userProfile.height)cm
-        - 体重: \(userProfile.weight)kg
+        - 年齢: \(userProfile.agePrompt)
+        - 性別: \(userProfile.genderPrompt)
+        - 身長: \(userProfile.heightPrompt)
+        - 体重: \(userProfile.weightPrompt)
 
         # 目標
         \(goal)
@@ -260,14 +266,6 @@ class AIWorkoutPlanner: ObservableObject {
 
         return lines
     }
-}
-
-// ダミーのユーザープロフィール（本来は永続化されたデータを使用）
-struct UserProfile {
-    let age: Int
-    let gender: String
-    let height: Int
-    let weight: Int
 }
 
 struct AIAssistantContext {

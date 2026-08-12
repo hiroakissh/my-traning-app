@@ -4,6 +4,8 @@ import SwiftData
 
 @main
 struct my_traning_appApp: App {
+    @StateObject private var watchConnectivity = WatchConnectivityService()
+
     private let sharedModelContainer: ModelContainer = {
         let schema = Schema([
             TrainingLog.self,
@@ -36,6 +38,7 @@ struct my_traning_appApp: App {
     var body: some Scene {
         WindowGroup {
             MainView()
+                .environmentObject(watchConnectivity)
         }
         .modelContainer(sharedModelContainer)
     }

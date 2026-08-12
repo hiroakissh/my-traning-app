@@ -3,6 +3,7 @@ import SwiftData
 
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var watchConnectivity: WatchConnectivityService
     @StateObject private var planner = AIWorkoutPlanner()
     @StateObject private var dashboardViewModel = HomeDashboardViewModel()
     private let lifecycle = WorkoutSessionLifecycleService()
@@ -59,6 +60,11 @@ struct HomeView: View {
                 #endif
             }
             .task { await dashboardViewModel.refreshHealthData() }
+            .task(id: todayRecommendation?.id) {
+                if let todayRecommendation {
+                    watchConnectivity.sendRecommendation(todayRecommendation)
+                }
+            }
             .task(id: triggerSuggestion) {
                 if triggerSuggestion {
                     let context = dashboardViewModel.makeAssistantContext(
@@ -197,6 +203,7 @@ struct HomeView: View {
                         }
                         .buttonStyle(.bordered)
                         .tint(AppColors.textSecondary)
+                        .disabled(hasRestLog(for: recommendation))
                     }
 
                     if let recommendationStatusMessage {
@@ -482,6 +489,11 @@ struct HomeView: View {
     }
 
     private func recordRest(for recommendation: DailyRecommendation) {
+        guard !hasRestLog(for: recommendation) else {
+            recommendationStatusMessage = "休養はすでに記録済みです。"
+            return
+        }
+
         recommendation.acceptedAction = .changedToRest
         let log = lifecycle.makeRestedLog(
             from: recommendation,
@@ -495,6 +507,12 @@ struct HomeView: View {
             recommendationStatusMessage = "休養として記録しました。"
         } catch {
             recommendationStatusMessage = "保存に失敗しました。"
+        }
+    }
+
+    private func hasRestLog(for recommendation: DailyRecommendation) -> Bool {
+        trainingLogs.contains {
+            $0.recommendationId == recommendation.id && $0.activityResult == .rested
         }
     }
 }
@@ -580,6 +598,7 @@ private struct MetricCard: View {
             ] as [any PersistentModel.Type],
             inMemory: true
         )
+        .environmentObject(WatchConnectivityService())
 }
 
 private extension View {

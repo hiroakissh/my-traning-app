@@ -53,6 +53,47 @@ final class WorkoutSessionLifecycleServiceTests: XCTestCase {
         XCTAssertTrue(log.planDeltaSummary?.contains("スキップ1セット") ?? false)
     }
 
+    func test_makeTrainingLogUsesActiveDurationWhenProvided() throws {
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let recommendation = makeRecommendation()
+        let service = WorkoutSessionLifecycleService()
+        let session = service.makeSession(from: recommendation, startedAt: start)
+        let exercise = try XCTUnwrap(session.exercises.first)
+        let firstSet = try XCTUnwrap(exercise.actualSets.first)
+
+        firstSet.status = .completed
+        exercise.status = .completed
+        session.status = .completed
+        session.endedAt = start.addingTimeInterval(3_600)
+
+        let log = service.makeTrainingLog(
+            from: session,
+            recommendation: recommendation,
+            activeDurationSec: 600
+        )
+
+        XCTAssertEqual(log.sessionDurationSec, 600)
+    }
+
+    func test_recoverySessionWithoutExecutedSetsIsSkipped() throws {
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let recommendation = makeRecommendation(recommendationType: .recovery)
+        let service = WorkoutSessionLifecycleService()
+        let session = service.makeSession(from: recommendation, startedAt: start)
+        let exercise = try XCTUnwrap(session.exercises.first)
+
+        for set in exercise.actualSets {
+            set.status = .skipped
+        }
+        exercise.status = .skipped
+        session.status = .cancelled
+        session.endedAt = start.addingTimeInterval(120)
+
+        let log = service.makeTrainingLog(from: session, recommendation: recommendation)
+
+        XCTAssertEqual(log.activityResult, .skipped)
+    }
+
     func test_makeRestedLogSeparatesRestedFromSkipped() {
         let recommendation = makeRecommendation(recommendationType: .rest, exercises: [])
         let service = WorkoutSessionLifecycleService()
